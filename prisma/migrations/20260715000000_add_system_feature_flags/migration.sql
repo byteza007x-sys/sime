@@ -1,0 +1,11 @@
+CREATE TABLE IF NOT EXISTS `system_feature_flags` (
+  `flag_key` VARCHAR(80) NOT NULL,
+  `label` VARCHAR(150) NOT NULL,
+  `description` TEXT NULL,
+  `is_enabled` BOOLEAN NOT NULL DEFAULT TRUE,
+  `updated_by` CHAR(36) NULL,
+  `updated_at` DATETIME(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0) ON UPDATE CURRENT_TIMESTAMP(0),
+  `created_at` TIMESTAMP(0) NOT NULL DEFAULT CURRENT_TIMESTAMP(0),
+  PRIMARY KEY (`flag_key`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+

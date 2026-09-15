@@ -1,0 +1,729 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model audit_logs {
+  log_id     Int      @id @default(autoincrement())
+  user_id    String?  @db.Char(36)
+  action     String?  @db.VarChar(255)
+  table_name String?  @db.VarChar(100)
+  record_id  String?  @db.VarChar(100)
+  old_data   String?  @db.LongText
+  new_data   String?  @db.LongText
+  ip_address String?  @db.VarChar(45)
+  created_at DateTime @default(now()) @db.Timestamp(0)
+  users      users?   @relation(fields: [user_id], references: [user_id], onUpdate: Restrict, map: "audit_logs_ibfk_1")
+
+  @@index([user_id], map: "user_id")
+}
+
+model customers {
+  customer_id       Int                 @id @default(autoincrement())
+  sap_bp_code       String?             @db.VarChar(50)
+  company_name      String              @db.VarChar(255)
+  account_balance   Decimal?            @db.Decimal(12, 2)
+  tax_id            String?             @db.VarChar(50)
+  contact_person    String?             @db.VarChar(100)
+  phone             String?             @db.VarChar(20)
+  email             String?             @db.VarChar(255)
+  address           String?             @db.Text
+  province          String?             @db.VarChar(100)
+  postal_code       String?             @db.VarChar(20)
+  created_at        DateTime            @default(now()) @db.Timestamp(0)
+  updated_at        DateTime            @updatedAt @db.DateTime(0)
+  customer_contacts customer_contacts[]
+  customer_sites    customer_sites[]
+  service_reports   service_reports[]
+
+  @@index([sap_bp_code], map: "sap_bp_code")
+}
+
+model customer_contacts {
+  contact_id      Int               @id @default(autoincrement())
+  customer_id     Int
+  site_id         Int?
+  full_name       String            @db.VarChar(150)
+  position        String?           @db.VarChar(150)
+  phone           String?           @db.VarChar(30)
+  email           String?           @db.VarChar(255)
+  is_primary      Boolean?          @default(false)
+  is_active       Boolean?          @default(true)
+  created_at      DateTime          @default(now()) @db.Timestamp(0)
+  customers       customers         @relation(fields: [customer_id], references: [customer_id], onUpdate: Restrict, map: "customer_contacts_ibfk_1")
+  customer_sites  customer_sites?   @relation(fields: [site_id], references: [site_id], onUpdate: Restrict, map: "customer_contacts_ibfk_2")
+  service_reports service_reports[]
+
+  @@index([customer_id], map: "customer_id")
+  @@index([site_id], map: "site_id")
+}
+
+model customer_sites {
+  site_id           Int                 @id @default(autoincrement())
+  customer_id       Int
+  site_code         String?             @db.VarChar(50)
+  site_name         String?             @db.VarChar(255)
+  address           String?             @db.Text
+  province          String?             @db.VarChar(100)
+  postal_code       String?             @db.VarChar(20)
+  contact_person    String?             @db.VarChar(150)
+  phone             String?             @db.VarChar(30)
+  email             String?             @db.VarChar(255)
+  gps_lat           Decimal?            @db.Decimal(10, 8)
+  gps_long          Decimal?            @db.Decimal(11, 8)
+  gps_radius_meters Int?                @default(300)
+  is_active         Boolean?            @default(true)
+  created_at        DateTime            @default(now()) @db.Timestamp(0)
+  updated_at        DateTime            @updatedAt @db.DateTime(0)
+  customer_contacts customer_contacts[]
+  inventory         inventory[]
+  customers         customers           @relation(fields: [customer_id], references: [customer_id], onUpdate: Restrict, map: "customer_sites_ibfk_1")
+  service_reports   service_reports[]
+
+  @@index([customer_id], map: "customer_id")
+}
+
+model engineers {
+  engineer_id                Int                          @id @default(autoincrement())
+  user_id                    String                       @db.Char(36)
+  employee_id                String?                      @unique(map: "employee_id") @db.VarChar(50)
+  first_name                 String?                      @db.VarChar(100)
+  last_name                  String?                      @db.VarChar(100)
+  phone                      String?                      @db.VarChar(30)
+  department                 String?                      @db.VarChar(100)
+  position                   String?                      @db.VarChar(100)
+  status                     engineer_status?             @default(Active)
+  avatar_url                 String?                      @db.VarChar(255)
+  created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  updated_at                 DateTime                     @updatedAt @db.DateTime(0)
+  service_report_assignments service_report_assignments[]
+  service_report_time_logs   service_report_time_logs[]
+  users                      users                        @relation(fields: [user_id], references: [user_id], onUpdate: Restrict, map: "engineers_ibfk_1")
+  service_reports            service_reports[]
+
+  @@index([user_id], map: "user_id")
+}
+
+model equipment_master {
+  equipment_id  Int         @id @default(autoincrement())
+  sap_item_no   String?     @db.VarChar(50)
+  brand         String?     @db.VarChar(100)
+  model         String?     @db.VarChar(100)
+  description   String?     @db.Text
+  category      String?     @db.VarChar(100)
+  unit          String?     @db.VarChar(50)
+  minimum_stock Int?        @default(0)
+  created_at    DateTime    @default(now()) @db.Timestamp(0)
+  updated_at    DateTime    @updatedAt @db.DateTime(0)
+  inventory     inventory[]
+
+  @@index([sap_item_no], map: "sap_item_no")
+}
+
+model inventory {
+  inventory_id        Int                   @id @default(autoincrement())
+  equipment_id        Int
+  serial_number       String                @unique(map: "serial_number") @db.VarChar(100)
+  batch_number        String?               @db.VarChar(100)
+  status              inventory_status?     @default(In_Stock)
+  warehouse_location  String?               @db.VarChar(100)
+  quantity            Decimal?              @default(1.000) @db.Decimal(12, 3)
+  inventory_value     Decimal?              @db.Decimal(14, 2)
+  current_site_id     Int?
+  purchase_date       DateTime?             @db.Date
+  warranty_expire_at  DateTime?             @db.Date
+  sap_is_active       Boolean?              @default(true)
+  last_seen_import_at DateTime?             @db.DateTime(0)
+  last_import_file    String?               @db.VarChar(255)
+  created_at          DateTime              @default(now()) @db.Timestamp(0)
+  updated_at          DateTime              @updatedAt @db.DateTime(0)
+  current_site        customer_sites?       @relation(fields: [current_site_id], references: [site_id], onUpdate: Restrict, map: "inventory_ibfk_2")
+  equipment_master    equipment_master      @relation(fields: [equipment_id], references: [equipment_id], onUpdate: Restrict, map: "inventory_ibfk_1")
+  inventory_movements inventory_movements[]
+  report_equipment    report_equipment[]
+
+  @@index([equipment_id], map: "equipment_id")
+  @@index([current_site_id], map: "current_site_id")
+}
+
+model inventory_movements {
+  movement_id     Int               @id @default(autoincrement())
+  inventory_id    Int
+  report_id       String?           @db.Char(36)
+  from_status     inventory_status?
+  to_status       inventory_status?
+  from_location   String?           @db.VarChar(100)
+  to_location     String?           @db.VarChar(100)
+  note            String?           @db.Text
+  moved_by        String?           @db.Char(36)
+  moved_at        DateTime          @default(now()) @db.Timestamp(0)
+  inventory       inventory         @relation(fields: [inventory_id], references: [inventory_id], onUpdate: Restrict, map: "inventory_movements_ibfk_1")
+  service_reports service_reports?  @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "inventory_movements_ibfk_2")
+  users           users?            @relation(fields: [moved_by], references: [user_id], onUpdate: Restrict, map: "inventory_movements_ibfk_3")
+
+  @@index([inventory_id], map: "inventory_id")
+  @@index([report_id], map: "report_id")
+  @@index([moved_by], map: "moved_by")
+}
+
+model report_equipment {
+  id              Int                          @id @default(autoincrement())
+  report_id       String                       @db.Char(36)
+  inventory_id    Int
+  action_type     report_equipment_action_type
+  reason          String?                      @db.Text
+  service_reports service_reports              @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "report_equipment_ibfk_1")
+  inventory       inventory                    @relation(fields: [inventory_id], references: [inventory_id], onUpdate: Restrict, map: "report_equipment_ibfk_2")
+
+  @@index([inventory_id], map: "inventory_id")
+  @@index([report_id], map: "report_id")
+}
+
+model roles {
+  role_id          Int                @id @default(autoincrement())
+  role_name        String             @unique(map: "role_name") @db.VarChar(50)
+  description      String?            @db.Text
+  created_at       DateTime           @default(now()) @db.Timestamp(0)
+  role_permissions role_permissions[]
+  users            users[]
+}
+
+model permissions {
+  permission_id    Int                @id @default(autoincrement())
+  permission_key   String             @unique(map: "permission_key") @db.VarChar(100)
+  description      String?            @db.Text
+  role_permissions role_permissions[]
+}
+
+model role_permissions {
+  id            Int         @id @default(autoincrement())
+  role_id       Int
+  permission_id Int
+  roles         roles       @relation(fields: [role_id], references: [role_id], onUpdate: Restrict, map: "role_permissions_ibfk_1")
+  permissions   permissions @relation(fields: [permission_id], references: [permission_id], onUpdate: Restrict, map: "role_permissions_ibfk_2")
+
+  @@unique([role_id, permission_id], map: "role_id_permission_id")
+  @@index([permission_id], map: "permission_id")
+}
+
+model service_reports {
+  report_id                     String                          @id @db.Char(36)
+  job_number                    String                          @unique(map: "job_number") @db.VarChar(50)
+  project_number                String?                         @db.VarChar(50)
+  customer_id                   Int
+  site_id                       Int?
+  contact_id                    Int?
+  engineer_id                   Int
+  created_by                    String?                         @db.Char(36)
+  template_version_id           Int?
+  service_type                  service_reports_service_type
+  source                        service_report_source?          @default(Admin)
+  priority                      service_report_priority?        @default(Normal)
+  status                        service_reports_status?         @default(Open)
+  date_issued                   DateTime?                       @db.Date
+  scheduled_date                DateTime?                       @db.Date
+  due_at                        DateTime?                       @db.DateTime(0)
+  assigned_at                   DateTime?                       @db.DateTime(0)
+  start_time                    DateTime?                       @db.DateTime(0)
+  finish_time                   DateTime?                       @db.DateTime(0)
+  problem_description           String?                         @db.Text
+  root_cause                    String?                         @db.Text
+  resolution                    String?                         @db.Text
+  recommendation                String?                         @db.Text
+  charge_type                   service_charge_type?            @default(Free_Service)
+  service_fee                   Decimal?                        @db.Decimal(12, 2)
+  other_charge_note             String?                         @db.Text
+  gps_lat                       Decimal?                        @db.Decimal(10, 8)
+  gps_long                      Decimal?                        @db.Decimal(11, 8)
+  customer_signature_url        String?                         @db.VarChar(255)
+  engineer_signature_url        String?                         @db.VarChar(255)
+  submitted_at                  DateTime?                       @db.DateTime(0)
+  reviewed_at                   DateTime?                       @db.DateTime(0)
+  reviewed_by                   String?                         @db.Char(36)
+  review_note                   String?                         @db.Text
+  created_at                    DateTime                        @default(now()) @db.Timestamp(0)
+  updated_at                    DateTime                        @updatedAt @db.DateTime(0)
+  customer_contacts             customer_contacts?              @relation(fields: [contact_id], references: [contact_id], onUpdate: Restrict, map: "service_reports_ibfk_5")
+  customer_sites                customer_sites?                 @relation(fields: [site_id], references: [site_id], onUpdate: Restrict, map: "service_reports_ibfk_3")
+  form_template_versions        service_form_template_versions? @relation(fields: [template_version_id], references: [version_id], onUpdate: Restrict, map: "service_reports_ibfk_6")
+  created_by_user               users?                          @relation("service_report_creator", fields: [created_by], references: [user_id], onUpdate: Restrict, map: "service_reports_ibfk_7")
+  inventory_movements           inventory_movements[]
+  report_equipment              report_equipment[]
+  service_report_assignments    service_report_assignments[]
+  service_report_items          service_report_items[]
+  service_report_assets         service_report_assets[]
+  service_report_attachments    service_report_attachments[]
+  service_report_checks         service_report_check_results[]
+  service_report_comments       service_report_comments[]
+  service_report_photos         service_report_photos[]
+  service_report_places         service_report_locations[]
+  service_report_signs          service_report_signatures[]
+  service_report_status_history service_report_status_history[]
+  service_report_time_logs      service_report_time_logs[]
+  satisfaction                  service_report_satisfaction?
+  customers                     customers                       @relation(fields: [customer_id], references: [customer_id], onUpdate: Restrict, map: "service_reports_ibfk_1")
+  engineers                     engineers                       @relation(fields: [engineer_id], references: [engineer_id], onUpdate: Restrict, map: "service_reports_ibfk_2")
+  reviewer                      users?                          @relation("service_report_reviewer", fields: [reviewed_by], references: [user_id], onUpdate: Restrict, map: "service_reports_ibfk_4")
+
+  @@index([customer_id], map: "customer_id")
+  @@index([contact_id], map: "contact_id")
+  @@index([engineer_id], map: "engineer_id")
+  @@index([site_id], map: "site_id")
+  @@index([created_by], map: "created_by")
+  @@index([reviewed_by], map: "reviewed_by")
+  @@index([template_version_id], map: "template_version_id")
+}
+
+model service_report_items {
+  item_id         Int             @id @default(autoincrement())
+  report_id       String          @db.Char(36)
+  line_no         Int
+  service_detail  String?         @db.Text
+  amount          Int?            @default(1)
+  root_problem    String?         @db.Text
+  resolution      String?         @db.Text
+  created_at      DateTime        @default(now()) @db.Timestamp(0)
+  service_reports service_reports @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_items_ibfk_1")
+
+  @@unique([report_id, line_no], map: "report_id_line_no")
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_assets {
+  asset_id              Int                              @id @default(autoincrement())
+  report_id             String                           @db.Char(36)
+  line_no               Int
+  action_type           service_report_asset_action_type
+  brand                 String?                          @db.VarChar(100)
+  model                 String?                          @db.VarChar(100)
+  amount                Int?                             @default(1)
+  serial_number         String?                          @db.VarChar(100)
+  installation_point    String?                          @db.VarChar(255)
+  return_reason         String?                          @db.Text
+  serial_label_photo_id Int?
+  created_at            DateTime                         @default(now()) @db.Timestamp(0)
+  service_reports       service_reports                  @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_assets_ibfk_1")
+  serial_label_photo    service_report_photos?           @relation(fields: [serial_label_photo_id], references: [photo_id], onUpdate: Restrict, map: "service_report_assets_ibfk_2")
+
+  @@unique([report_id, line_no, action_type], map: "report_id_line_no_action_type")
+  @@index([report_id], map: "report_id")
+  @@index([serial_label_photo_id], map: "serial_label_photo_id")
+}
+
+model service_report_photos {
+  photo_id              Int                       @id @default(autoincrement())
+  report_id             String                    @db.Char(36)
+  file_id               Int?
+  photo_type            service_report_photo_type
+  file_url              String                    @db.VarChar(255)
+  caption               String?                   @db.VarChar(255)
+  gps_lat               Decimal?                  @db.Decimal(10, 8)
+  gps_long              Decimal?                  @db.Decimal(11, 8)
+  captured_at           DateTime?                 @db.DateTime(0)
+  created_at            DateTime                  @default(now()) @db.Timestamp(0)
+  uploaded_files        uploaded_files?           @relation(fields: [file_id], references: [file_id], onUpdate: Restrict, map: "service_report_photos_ibfk_2")
+  service_reports       service_reports           @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_photos_ibfk_1")
+  service_report_assets service_report_assets[]
+
+  @@index([file_id], map: "file_id")
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_locations {
+  location_id     Int                          @id @default(autoincrement())
+  report_id       String                       @db.Char(36)
+  location_type   service_report_location_type
+  gps_lat         Decimal                      @db.Decimal(10, 8)
+  gps_long        Decimal                      @db.Decimal(11, 8)
+  accuracy_meters Decimal?                     @db.Decimal(8, 2)
+  distance_meters Decimal?                     @db.Decimal(10, 2)
+  captured_at     DateTime                     @db.DateTime(0)
+  created_at      DateTime                     @default(now()) @db.Timestamp(0)
+  service_reports service_reports              @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_locations_ibfk_1")
+
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_signatures {
+  signature_id    Int                           @id @default(autoincrement())
+  report_id       String                        @db.Char(36)
+  file_id         Int?
+  signer_type     service_report_signature_type
+  signer_name     String?                       @db.VarChar(150)
+  signer_position String?                       @db.VarChar(150)
+  signature_url   String                        @db.VarChar(255)
+  signed_at       DateTime?                     @db.DateTime(0)
+  created_at      DateTime                      @default(now()) @db.Timestamp(0)
+  uploaded_files  uploaded_files?               @relation(fields: [file_id], references: [file_id], onUpdate: Restrict, map: "service_report_signatures_ibfk_2")
+  service_reports service_reports               @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_signatures_ibfk_1")
+
+  @@index([file_id], map: "file_id")
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_satisfaction {
+  satisfaction_id        Int             @id @default(autoincrement())
+  report_id              String          @unique(map: "report_id") @db.Char(36)
+  responsiveness_score   Int?
+  staff_knowledge_score  Int?
+  service_quality_score  Int?
+  problem_solution_score Int?
+  overall_score          Int?
+  csat_average           Decimal?        @db.Decimal(3, 2)
+  nps_score              Int?
+  customer_comment       String?         @db.Text
+  created_at             DateTime        @default(now()) @db.Timestamp(0)
+  service_reports        service_reports @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_satisfaction_ibfk_1")
+}
+
+model service_report_assignments {
+  assignment_id   Int                        @id @default(autoincrement())
+  report_id       String                     @db.Char(36)
+  engineer_id     Int
+  assigned_by     String?                    @db.Char(36)
+  assignment_role service_assignment_role?   @default(Primary)
+  status          service_assignment_status? @default(Assigned)
+  assigned_at     DateTime                   @default(now()) @db.Timestamp(0)
+  accepted_at     DateTime?                  @db.DateTime(0)
+  completed_at    DateTime?                  @db.DateTime(0)
+  note            String?                    @db.Text
+  service_reports service_reports            @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_assignments_ibfk_1")
+  engineers       engineers                  @relation(fields: [engineer_id], references: [engineer_id], onUpdate: Restrict, map: "service_report_assignments_ibfk_2")
+  users           users?                     @relation(fields: [assigned_by], references: [user_id], onUpdate: Restrict, map: "service_report_assignments_ibfk_3")
+
+  @@unique([report_id, engineer_id], map: "report_id_engineer_id")
+  @@index([assigned_by], map: "assigned_by")
+  @@index([engineer_id], map: "engineer_id")
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_status_history {
+  history_id      Int                     @id @default(autoincrement())
+  report_id       String                  @db.Char(36)
+  from_status     service_reports_status?
+  to_status       service_reports_status
+  changed_by      String?                 @db.Char(36)
+  note            String?                 @db.Text
+  created_at      DateTime                @default(now()) @db.Timestamp(0)
+  service_reports service_reports         @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_status_history_ibfk_1")
+  users           users?                  @relation(fields: [changed_by], references: [user_id], onUpdate: Restrict, map: "service_report_status_history_ibfk_2")
+
+  @@index([changed_by], map: "changed_by")
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_check_results {
+  check_id        Int                         @id @default(autoincrement())
+  report_id       String                      @db.Char(36)
+  check_type      service_report_check_type
+  status          service_report_check_status
+  message         String?                     @db.Text
+  checked_at      DateTime                    @default(now()) @db.Timestamp(0)
+  checked_by      String?                     @db.Char(36)
+  service_reports service_reports             @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_check_results_ibfk_1")
+  users           users?                      @relation(fields: [checked_by], references: [user_id], onUpdate: Restrict, map: "service_report_check_results_ibfk_2")
+
+  @@index([checked_by], map: "checked_by")
+  @@index([report_id], map: "report_id")
+}
+
+model service_report_comments {
+  comment_id      Int                         @id @default(autoincrement())
+  report_id       String                      @db.Char(36)
+  user_id         String?                     @db.Char(36)
+  comment_type    service_report_comment_type @default(Internal)
+  body            String                      @db.Text
+  created_at      DateTime                    @default(now()) @db.Timestamp(0)
+  service_reports service_reports             @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_comments_ibfk_1")
+  users           users?                      @relation(fields: [user_id], references: [user_id], onUpdate: Restrict, map: "service_report_comments_ibfk_2")
+
+  @@index([report_id], map: "report_id")
+  @@index([user_id], map: "user_id")
+}
+
+model service_report_time_logs {
+  time_log_id      Int                         @id @default(autoincrement())
+  report_id        String                      @db.Char(36)
+  engineer_id      Int
+  event_type       service_time_log_event_type
+  started_at       DateTime                    @db.DateTime(0)
+  ended_at         DateTime?                   @db.DateTime(0)
+  duration_minutes Int?
+  note             String?                     @db.Text
+  service_reports  service_reports             @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_time_logs_ibfk_1")
+  engineers        engineers                   @relation(fields: [engineer_id], references: [engineer_id], onUpdate: Restrict, map: "service_report_time_logs_ibfk_2")
+
+  @@index([engineer_id], map: "engineer_id")
+  @@index([report_id], map: "report_id")
+}
+
+model uploaded_files {
+  file_id                    Int                          @id @default(autoincrement())
+  file_category              uploaded_file_category
+  file_url                   String                       @db.VarChar(255)
+  original_name              String?                      @db.VarChar(255)
+  mime_type                  String?                      @db.VarChar(100)
+  size_bytes                 BigInt?
+  uploaded_by                String?                      @db.Char(36)
+  created_at                 DateTime                     @default(now()) @db.Timestamp(0)
+  users                      users?                       @relation(fields: [uploaded_by], references: [user_id], onUpdate: Restrict, map: "uploaded_files_ibfk_1")
+  service_report_attachments service_report_attachments[]
+  service_report_photos      service_report_photos[]
+  service_report_signatures  service_report_signatures[]
+
+  @@index([uploaded_by], map: "uploaded_by")
+}
+
+model service_report_attachments {
+  attachment_id   Int                            @id @default(autoincrement())
+  report_id       String                         @db.Char(36)
+  file_id         Int
+  attachment_type service_report_attachment_type @default(Other)
+  note            String?                        @db.Text
+  created_at      DateTime                       @default(now()) @db.Timestamp(0)
+  service_reports service_reports                @relation(fields: [report_id], references: [report_id], onUpdate: Restrict, map: "service_report_attachments_ibfk_1")
+  uploaded_files  uploaded_files                 @relation(fields: [file_id], references: [file_id], onUpdate: Restrict, map: "service_report_attachments_ibfk_2")
+
+  @@index([file_id], map: "file_id")
+  @@index([report_id], map: "report_id")
+}
+
+model notifications {
+  notification_id   Int               @id @default(autoincrement())
+  user_id           String            @db.Char(36)
+  notification_type notification_type
+  title             String            @db.VarChar(150)
+  body              String?           @db.Text
+  link_url          String?           @db.VarChar(255)
+  read_at           DateTime?         @db.DateTime(0)
+  created_at        DateTime          @default(now()) @db.Timestamp(0)
+  users             users             @relation(fields: [user_id], references: [user_id], onUpdate: Restrict, map: "notifications_ibfk_1")
+
+  @@index([user_id], map: "user_id")
+}
+
+model user_devices {
+  device_id    Int       @id @default(autoincrement())
+  user_id      String    @db.Char(36)
+  device_name  String?   @db.VarChar(150)
+  platform     String?   @db.VarChar(50)
+  push_token   String?   @db.VarChar(255)
+  last_seen_at DateTime? @db.DateTime(0)
+  created_at   DateTime  @default(now()) @db.Timestamp(0)
+  users        users     @relation(fields: [user_id], references: [user_id], onUpdate: Restrict, map: "user_devices_ibfk_1")
+
+  @@index([user_id], map: "user_id")
+}
+
+model service_form_templates {
+  template_id   Int                              @id @default(autoincrement())
+  template_code String                           @unique(map: "template_code") @db.VarChar(50)
+  name          String                           @db.VarChar(150)
+  description   String?                          @db.Text
+  is_active     Boolean?                         @default(true)
+  created_at    DateTime                         @default(now()) @db.Timestamp(0)
+  versions      service_form_template_versions[]
+}
+
+model service_form_template_versions {
+  version_id             Int                    @id @default(autoincrement())
+  template_id            Int
+  version_no             Int
+  form_schema            Json?
+  effective_from         DateTime?              @db.Date
+  created_at             DateTime               @default(now()) @db.Timestamp(0)
+  service_form_templates service_form_templates @relation(fields: [template_id], references: [template_id], onUpdate: Restrict, map: "service_form_template_versions_ibfk_1")
+  service_reports        service_reports[]
+
+  @@unique([template_id, version_no], map: "template_id_version_no")
+  @@index([template_id], map: "template_id")
+}
+
+model users {
+  user_id                       String                          @id @db.Char(36)
+  username                      String?                         @unique(map: "username") @db.VarChar(100)
+  email                         String                          @unique(map: "email") @db.VarChar(255)
+  password_hash                 String                          @db.VarChar(255)
+  role_id                       Int
+  full_name                     String?                         @db.VarChar(150)
+  phone                         String?                         @db.VarChar(30)
+  is_active                     Boolean?                        @default(true)
+  last_login_at                 DateTime?                       @db.DateTime(0)
+  created_at                    DateTime                        @default(now()) @db.Timestamp(0)
+  updated_at                    DateTime                        @updatedAt @db.DateTime(0)
+  audit_logs                    audit_logs[]
+  engineers                     engineers[]
+  inventory_movements           inventory_movements[]
+  notifications                 notifications[]
+  service_report_assignments    service_report_assignments[]
+  service_report_checks         service_report_check_results[]
+  service_report_comments       service_report_comments[]
+  service_report_status_history service_report_status_history[]
+  uploaded_files                uploaded_files[]
+  user_devices                  user_devices[]
+  created_service_reports       service_reports[]               @relation("service_report_creator")
+  reviewed_service_reports      service_reports[]               @relation("service_report_reviewer")
+  roles                         roles                           @relation(fields: [role_id], references: [role_id], onUpdate: Restrict, map: "users_ibfk_1")
+
+  @@index([role_id], map: "role_id")
+}
+
+enum inventory_status {
+  In_Stock  @map("In Stock")
+  Installed
+  Returned
+  Defective
+  Reserved
+  Lost
+}
+
+enum report_equipment_action_type {
+  Installed
+  Returned
+}
+
+enum engineer_status {
+  Active
+  On_Leave @map("On Leave")
+  Offline
+}
+
+enum uploaded_file_category {
+  Photo
+  Signature
+  Attachment
+  Export
+}
+
+enum service_report_asset_action_type {
+  Installed
+  Delivered
+  Returned
+}
+
+enum service_assignment_role {
+  Primary
+  Assistant
+  Observer
+}
+
+enum service_assignment_status {
+  Assigned
+  Accepted
+  Declined
+  Completed
+  Cancelled
+}
+
+enum service_charge_type {
+  Free_Service @map("Free Service")
+  Charged
+  Other
+}
+
+enum service_report_attachment_type {
+  Document
+  PDF
+  Image
+  Other
+}
+
+enum service_report_check_status {
+  Passed
+  Warning
+  Failed
+}
+
+enum service_report_check_type {
+  Required_Fields @map("Required Fields")
+  Photos
+  GPS
+  Signature
+  Equipment
+  Satisfaction
+}
+
+enum service_report_comment_type {
+  Internal
+  Technician
+  Customer
+  System
+}
+
+enum service_report_location_type {
+  Start
+  Photo
+  Finish
+  Signature
+}
+
+enum service_report_photo_type {
+  Before
+  During
+  After
+  Serial_Label @map("Serial Label")
+  Site
+  Other
+}
+
+enum service_report_signature_type {
+  Engineer
+  Customer
+}
+
+enum service_report_priority {
+  Low
+  Normal
+  High
+  Urgent
+}
+
+enum service_report_source {
+  Admin
+  Technician
+  Customer
+  Imported
+}
+
+enum service_time_log_event_type {
+  Travel
+  Start_Work  @map("Start Work")
+  Pause
+  Resume
+  Finish_Work @map("Finish Work")
+}
+
+enum notification_type {
+  Job_Assigned         @map("Job Assigned")
+  Report_Submitted     @map("Report Submitted")
+  Report_Need_Revision @map("Report Need Revision")
+  Report_Approved      @map("Report Approved")
+  System
+}
+
+enum service_reports_service_type {
+  Installation
+  Maintenance
+  Repair
+  PM
+  Emergency
+}
+
+enum service_reports_status {
+  Draft
+  Open
+  Assigned
+  In_Progress      @map("In Progress")
+  On_Site          @map("On Site")
+  Pending_Customer @map("Pending Customer")
+  Submitted
+  Need_Revision    @map("Need Revision")
+  Completed
+  Approved
+  Closed
+  Cancelled
+}

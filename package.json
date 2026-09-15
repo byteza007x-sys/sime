@@ -1,0 +1,55 @@
+{
+  "name": "servicesiame",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:lan": "next dev -H 0.0.0.0",
+    "dev:phone": "next dev -H 0.0.0.0 -p 3000",
+    "lan:info": "node scripts/lan-info.mjs",
+    "phone:build": "next build",
+    "phone:start": "next start -H 0.0.0.0 -p 3000",
+    "phone:check": "node scripts/phone-check.mjs",
+    "build": "next build",
+    "start": "next start",
+    "start:prod": "next start -H 0.0.0.0 -p 3000",
+    "typecheck": "tsc --noEmit",
+    "prisma:generate": "prisma generate",
+    "prisma:migrate:deploy": "prisma migrate deploy",
+    "check:prod": "node scripts/production-check.mjs",
+    "owner:ensure": "node scripts/ensure-owner.mjs",
+    "backup": "node scripts/backup-system.mjs",
+    "backup:dry": "node scripts/backup-system.mjs --dry-run",
+    "backup:daily": "node scripts/backup-system.mjs",
+    "backup:install-cron": "node scripts/install-backup-cron.mjs",
+    "db:backup": "node scripts/backup-db.mjs",
+    "db:backup:dry": "node scripts/backup-db.mjs --dry-run",
+    "lint": "eslint",
+    "seed": "node scripts/seed.mjs"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "dependencies": {
+    "@prisma/adapter-mariadb": "^7.8.0",
+    "@prisma/client": "^7.8.0",
+    "@types/qrcode": "^1.5.6",
+    "lucide-react": "^1.23.0",
+    "next": "16.2.10",
+    "prisma": "^7.8.0",
+    "qrcode": "^1.5.4",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "recharts": "^3.9.2"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4",
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.10",
+    "tailwindcss": "^4",
+    "typescript": "^5"
+  }
+}

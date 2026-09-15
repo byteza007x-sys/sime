@@ -1,0 +1,14 @@
+<svg width="220" height="220" viewBox="0 0 220 220" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect x="34" y="64" width="152" height="122" rx="14" fill="#262626"/>
+  <rect x="46" y="76" width="128" height="98" rx="7" fill="#2EA7E0"/>
+  <path d="M112 76H174V174H112V76Z" fill="#2388C8"/>
+  <path d="M49 154H117V174H49V154Z" fill="#1F6FB8"/>
+  <rect x="128" y="94" width="19" height="19" rx="2" fill="white"/>
+  <rect x="155" y="94" width="19" height="19" rx="2" fill="white"/>
+  <rect x="128" y="124" width="19" height="19" rx="2" fill="white"/>
+  <rect x="155" y="124" width="19" height="19" rx="2" fill="white"/>
+  <rect x="128" y="153" width="19" height="19" rx="2" fill="white"/>
+  <rect x="155" y="153" width="19" height="19" rx="2" fill="white"/>
+  <path d="M74 45H120C137 45 149 57 149 74H112C112 68 108 65 101 65H77C70 65 66 68 66 74C66 80 70 83 77 83H112C137 83 153 97 153 120C153 144 135 158 107 158H68C43 158 27 144 27 120H65C65 127 70 131 79 131H110C118 131 123 127 123 121C123 115 118 112 110 112H75C49 112 32 98 32 75C32 56 48 45 74 45Z" fill="#231F20"/>
+  <path d="M74 55H120C132 55 139 62 140 74H114C113 67 108 63 100 63H77C66 63 59 68 59 76C59 84 66 90 78 90H112C132 90 145 101 145 120C145 139 131 149 107 149H68C48 149 37 139 36 120H62C64 130 70 136 80 136H110C123 136 131 130 131 120C131 110 123 104 110 104H75C53 104 40 93 40 76C40 63 52 55 74 55Z" fill="white"/>
+</svg>
