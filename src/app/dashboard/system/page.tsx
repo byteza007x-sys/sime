@@ -109,7 +109,7 @@ const copy = {
     },
     nav: {
       dashboard: "Dashboard",
-      serviceReports: "Service Reports",
+      serviceReports: "Jobs",
       customers: "Customers",
       inventory: "Inventory",
       users: "Users",
@@ -254,7 +254,7 @@ const backupCopy = {
     latest: "สำรองล่าสุด",
     database: "ฐานข้อมูล",
     uploads: "รูปและลายเซ็น",
-    retention: "เก็บย้อนหลัง",
+    retention: "ระยะเวลาเก็บ",
     size: "ขนาดไฟล์",
     errors: "ข้อผิดพลาด",
     days: "วัน",
@@ -391,7 +391,6 @@ export default async function DashboardSystemPage({ searchParams }: SystemPagePr
     counts,
     activeUsers,
     submittedReports,
-    needRevisionReports,
     auditLogCount,
     recentLogs,
     recentImportLogs,
@@ -407,7 +406,6 @@ export default async function DashboardSystemPage({ searchParams }: SystemPagePr
     ]),
     prisma.users.count({ where: { is_active: true } }),
     prisma.service_reports.count({ where: { status: "Submitted" } }),
-    prisma.service_reports.count({ where: { status: "Need_Revision" } }),
     prisma.audit_logs.count(),
     prisma.audit_logs.findMany({
       include: {
@@ -531,7 +529,10 @@ export default async function DashboardSystemPage({ searchParams }: SystemPagePr
     {
       icon: ClipboardList,
       label: t.reports,
-      detail: `${formatNumber(submittedReports, locale)} submitted / ${formatNumber(needRevisionReports, locale)} revision`,
+      detail:
+        locale === "th"
+          ? `${formatNumber(submittedReports, locale)} งานที่ส่งตรวจ`
+          : `${formatNumber(submittedReports, locale)} submitted`,
       ready: true,
       href: "/reports",
     },

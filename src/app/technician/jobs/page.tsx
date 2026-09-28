@@ -14,10 +14,12 @@ import {
   PenLine,
   Search,
   ShieldCheck,
+  UserPlus,
   UserRound,
 } from "lucide-react";
 import BrandLogo from "@/components/brand-logo";
 import LanguageSwitcher from "@/components/language-switcher";
+import MobileBottomNav from "@/components/mobile-bottom-nav";
 import NotificationInbox from "@/components/notification-inbox";
 import ThemeToggle from "@/components/theme-toggle";
 import { logoutAction } from "@/app/login/actions";
@@ -27,6 +29,7 @@ import { requireUser } from "@/lib/auth";
 import { requireFeature } from "@/lib/features";
 import { getLocale, type Locale, type RouteSearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { assignServiceReportAction } from "@/app/reports/[reportId]/actions";
 import { updateTechnicianReportPriorityAction } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -104,18 +107,24 @@ const copy = {
     clear: "Clear",
     today: "Today",
     needAction: "Backlog",
-    waitingReview: "Waiting review",
-    completed: "Completed",
+    waitingReview: "Submitted",
+    completed: "Approved",
     total: "My reports",
     queuePriority: "Queue priority",
     savePriority: "Save priority",
+    transferTitle: "Transfer job",
+    transferUser: "Send to",
+    transferNote: "Note",
+    transferNotePlaceholder: "Why is this job being transferred?",
+    transferSubmit: "Send job",
+    transferLocked: "Submitted or approved jobs cannot be transferred.",
     nextTitle: "Next job to handle",
     nextEmpty: "No urgent work right now.",
     nextEmptyDetail: "Create a new service report or wait for admin review feedback.",
     filters: {
       Action: "Need action",
-      Review: "Waiting review",
-      Done: "Done",
+      Review: "Submitted",
+      Done: "Approved",
       All: "All",
     },
     sectionTitle: "Work queue",
@@ -127,7 +136,7 @@ const copy = {
     status: "Status",
     serviceType: "Service type",
     priority: "Priority",
-    evidence: "Evidence",
+    evidence: "Records",
     photos: "photos",
     signatures: "signatures",
     locations: "locations",
@@ -147,11 +156,11 @@ const copy = {
       In_Progress: "In Progress",
       On_Site: "On Site",
       Pending_Customer: "Pending Customer",
-      Submitted: "Waiting review",
-      Need_Revision: "Need revision",
-      Completed: "Completed",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
       Approved: "Approved",
-      Closed: "Closed",
+      Closed: "Approved",
       Cancelled: "Cancelled",
       Unknown: "Unknown",
     },
@@ -168,16 +177,16 @@ const copy = {
     clear: "ล้าง",
     today: "วันนี้",
     needAction: "ต้องทำต่อ",
-    waitingReview: "รอตรวจ",
-    completed: "เสร็จแล้ว",
+    waitingReview: "Submitted",
+    completed: "Approved",
     total: "ใบงานของฉัน",
     nextTitle: "งานถัดไปที่ควรทำ",
     nextEmpty: "ตอนนี้ยังไม่มีงานเร่งด่วน",
     nextEmptyDetail: "สร้างใบเซอร์วิสใหม่ หรือรอผลตรวจจากแอดมินได้เลย",
     filters: {
       Action: "ต้องทำต่อ",
-      Review: "รอตรวจ",
-      Done: "เสร็จแล้ว",
+      Review: "Submitted",
+      Done: "Approved",
       All: "ทั้งหมด",
     },
     sectionTitle: "คิวงาน",
@@ -189,7 +198,7 @@ const copy = {
     status: "สถานะ",
     serviceType: "ประเภทงาน",
     priority: "ความสำคัญ",
-    evidence: "หลักฐาน",
+    evidence: "รายการบันทึก",
     photos: "รูป",
     signatures: "ลายเซ็น",
     locations: "ตำแหน่ง",
@@ -209,11 +218,11 @@ const copy = {
       In_Progress: "กำลังทำ",
       On_Site: "ถึงหน้างาน",
       Pending_Customer: "รอลูกค้า",
-      Submitted: "รอตรวจ",
-      Need_Revision: "ต้องแก้ไข",
-      Completed: "เสร็จสิ้น",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
       Approved: "ตรวจแล้ว",
-      Closed: "ปิดงาน",
+      Closed: "Approved",
       Cancelled: "ยกเลิก",
       Unknown: "ไม่ทราบสถานะ",
     },
@@ -232,17 +241,24 @@ const technicianThaiCopy = {
   searchButton: "ค้นหา",
   clear: "ล้าง",
   needAction: "งานค้าง",
-  waitingReview: "รอตรวจ",
+  waitingReview: "Submitted",
+  completed: "Approved",
   total: "ทั้งหมด",
   queuePriority: "จัดความสำคัญคิว",
   savePriority: "บันทึก",
+  transferTitle: "ส่งต่องาน",
+  transferUser: "ส่งให้",
+  transferNote: "หมายเหตุ",
+  transferNotePlaceholder: "ระบุเหตุผลหรือรายละเอียดงานที่ส่งต่อ",
+  transferSubmit: "ส่งต่องาน",
+  transferLocked: "งานที่ส่งตรวจหรืออนุมัติแล้วส่งต่อไม่ได้",
   nextTitle: "งานที่ควรทำต่อ",
   nextEmpty: "ตอนนี้ยังไม่มีงานค้าง",
   nextEmptyDetail: "สร้างใบเซอร์วิซใหม่ หรือรอผลตรวจจากแอดมินได้เลย",
   filters: {
     Action: "งานค้าง",
-    Review: "รอตรวจ",
-    Done: "เสร็จแล้ว",
+    Review: "Submitted",
+    Done: "Approved",
     All: "ทั้งหมด",
   },
   sectionTitle: "คิวงานของฉัน",
@@ -254,7 +270,7 @@ const technicianThaiCopy = {
   status: "สถานะ",
   serviceType: "ประเภทงาน",
   priority: "ความสำคัญ",
-  evidence: "หลักฐาน",
+  evidence: "รายการบันทึก",
   photos: "รูป",
   signatures: "ลายเซ็น",
   locations: "ตำแหน่ง",
@@ -274,11 +290,11 @@ const technicianThaiCopy = {
     In_Progress: "กำลังทำ",
     On_Site: "ถึงหน้างาน",
     Pending_Customer: "รอลูกค้า",
-    Submitted: "รอตรวจ",
-    Need_Revision: "ต้องแก้ไข",
-    Completed: "เสร็จสิ้น",
+    Submitted: "Submitted",
+    Need_Revision: "Active",
+    Completed: "Approved",
     Approved: "ตรวจแล้ว",
-    Closed: "ปิดงาน",
+    Closed: "Approved",
     Cancelled: "ยกเลิก",
     Unknown: "ไม่ทราบสถานะ",
   },
@@ -551,12 +567,15 @@ export default async function TechnicianJobsPage({
     reviewCount,
     totalCount,
     notifications,
+    assigneeUsers,
   ] = await Promise.all([
       prisma.service_reports.findMany({
         where: reportWhere,
         select: {
           report_id: true,
           job_number: true,
+          created_by: true,
+          engineer_id: true,
           status: true,
           updated_at: true,
           created_at: true,
@@ -580,6 +599,16 @@ export default async function TechnicianJobsPage({
               service_report_photos: true,
               service_report_places: true,
               service_report_signs: true,
+            },
+          },
+          service_report_assignments: {
+            where: {
+              status: {
+                in: ["Assigned", "Accepted"],
+              },
+            },
+            select: {
+              engineer_id: true,
             },
           },
         },
@@ -629,6 +658,35 @@ export default async function TechnicianJobsPage({
         },
         take: 6,
       }),
+      prisma.users.findMany({
+        where: {
+          is_active: true,
+          roles: {
+            role_name: {
+              in: ["admin", "support", "user"],
+            },
+          },
+        },
+        select: {
+          user_id: true,
+          username: true,
+          full_name: true,
+          email: true,
+          roles: {
+            select: {
+              role_name: true,
+            },
+          },
+        },
+        orderBy: [
+          {
+            full_name: "asc",
+          },
+          {
+            username: "asc",
+          },
+        ],
+      }),
     ]);
 
   const sortedReports = [...reports].sort((a, b) => {
@@ -671,7 +729,7 @@ export default async function TechnicianJobsPage({
   const roleLabel = isAdmin ? profile.admin : isSupport ? profile.support : profile.user;
 
   return (
-    <main className="animate-page min-h-screen bg-[#f3f6fb] px-3 py-3 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6 sm:py-5">
+    <main className="animate-page min-h-screen bg-[#f3f6fb] px-3 py-3 pb-24 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6 sm:py-5 md:pb-5">
       <div className="mx-auto max-w-7xl space-y-4 sm:space-y-5">
         <header className="animate-panel overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="grid gap-4 p-4 sm:p-5 lg:grid-cols-[1fr_auto] lg:items-start">
@@ -845,29 +903,29 @@ export default async function TechnicianJobsPage({
                   className="h-12 w-full rounded-xl border border-slate-200 bg-slate-50 pl-12 pr-4 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
                 />
               </label>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-[1fr_auto] gap-2 sm:flex sm:items-center">
                 <button
                   type="submit"
-                  className="interactive-button inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 text-sm font-bold text-white hover:bg-blue-800 lg:flex-none"
+                  className="interactive-button inline-flex h-12 min-w-0 items-center justify-center gap-2 rounded-xl bg-blue-700 px-5 text-sm font-bold text-white hover:bg-blue-800 sm:min-w-28"
                 >
                   <Search size={17} />
                   {t.searchButton}
                 </button>
                 <Link
                   href={withLocale("/technician/jobs", locale)}
-                  className="interactive-button inline-flex h-12 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                  className="interactive-button inline-flex h-12 min-w-16 items-center justify-center rounded-xl border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                 >
                   {t.clear}
                 </Link>
               </div>
             </form>
 
-            <div className="mt-4 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap items-center gap-2">
               {visibleFilters.map((filter) => (
                 <Link
                   key={filter}
                   href={filterHref(filter, locale, queryText)}
-                  className={`interactive-button rounded-full px-4 py-2 text-sm font-bold ring-1 ${
+                  className={`interactive-button inline-flex h-11 min-w-24 items-center justify-center rounded-full px-4 text-center text-sm font-bold ring-1 ${
                     selectedFilter === filter
                       ? "bg-blue-700 text-white ring-blue-700"
                       : "bg-slate-50 text-slate-600 ring-slate-200 hover:bg-white dark:bg-slate-950 dark:text-slate-300 dark:ring-slate-700"
@@ -916,7 +974,18 @@ export default async function TechnicianJobsPage({
             </div>
           ) : (
             <div className="stagger-list grid gap-3 p-3 sm:gap-4 sm:p-4 md:grid-cols-2 xl:grid-cols-3">
-              {sortedReports.map((report) => (
+              {sortedReports.map((report) => {
+                const isCurrentAssignee =
+                  engineerIds.includes(report.engineer_id) ||
+                  report.service_report_assignments.some((assignment) =>
+                    engineerIds.includes(assignment.engineer_id),
+                  );
+                const canTransferReport =
+                  isAdmin || report.created_by === user.user_id || isCurrentAssignee;
+                const transferLocked =
+                  report.status !== null && lockedForUserStatuses.has(report.status);
+
+                return (
                 <article
                   key={report.report_id}
                   className={`interactive-card flex flex-col rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950 ${isFieldUser ? "min-h-0" : "min-h-[300px]"}`}
@@ -1015,6 +1084,74 @@ export default async function TechnicianJobsPage({
                     <EvidenceCount label={t.locations} value={report._count.service_report_places} />
                   </div>
 
+                  {canTransferReport ? (
+                    <form
+                      action={assignServiceReportAction}
+                      className="mt-4 rounded-xl border border-blue-100 bg-white p-3 dark:border-blue-900 dark:bg-slate-900"
+                    >
+                      <input type="hidden" name="lang" value={locale} />
+                      <input type="hidden" name="reportId" value={report.report_id} />
+                      <input type="hidden" name="returnTo" value="technician_jobs" />
+                      <div className="mb-2 flex items-center gap-2 text-sm font-black text-slate-900 dark:text-white">
+                        <UserPlus size={16} className="text-blue-700 dark:text-blue-300" />
+                        {t.transferTitle}
+                      </div>
+                      {transferLocked ? (
+                        <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-500 dark:bg-slate-950 dark:text-slate-400">
+                          {t.transferLocked}
+                        </p>
+                      ) : (
+                        <div className="grid gap-2">
+                          <label className="block">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                              {t.transferUser}
+                            </span>
+                            <select
+                              name="assigneeUserId"
+                              required
+                              defaultValue=""
+                              className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                            >
+                              <option value="">{t.transferUser}</option>
+                              {assigneeUsers.map((assigneeUser) => {
+                                const assigneeLabel =
+                                  assigneeUser.full_name ||
+                                  assigneeUser.username ||
+                                  assigneeUser.email;
+
+                                return (
+                                  <option
+                                    key={assigneeUser.user_id}
+                                    value={assigneeUser.user_id}
+                                  >
+                                    {assigneeLabel} ({assigneeUser.roles.role_name})
+                                  </option>
+                                );
+                              })}
+                            </select>
+                          </label>
+                          <label className="block">
+                            <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                              {t.transferNote}
+                            </span>
+                            <input
+                              name="assignmentNote"
+                              placeholder={t.transferNotePlaceholder}
+                              className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                            />
+                          </label>
+                          <button
+                            type="submit"
+                            className="interactive-button inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800 dark:bg-blue-700 dark:hover:bg-blue-800"
+                          >
+                            <UserPlus size={16} />
+                            {t.transferSubmit}
+                          </button>
+                        </div>
+                      )}
+                    </form>
+                  ) : null}
+
                   <div className="mt-auto grid gap-2 pt-4 sm:grid-cols-[1fr_auto]">
                     <Link
                       href={getPrimaryHref(report.report_id, report.status, locale)}
@@ -1023,21 +1160,20 @@ export default async function TechnicianJobsPage({
                       {getPrimaryLabel(report.status, t)}
                       <ArrowRight size={15} />
                     </Link>
-                    <div className={isFieldUser ? "hidden sm:block" : ""}>
-                      <Link
-                        href={withLocale(`/reports/${report.report_id}`, locale)}
-                        className="interactive-button inline-flex h-10 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-900"
-                      >
-                        {t.detail}
-                      </Link>
-                    </div>
                   </div>
                 </article>
-              ))}
+                );
+              })}
             </div>
           )}
         </section>
       </div>
+      <MobileBottomNav
+        locale={locale}
+        active="dashboard"
+        homeHref="/technician/jobs"
+        showQr={isAdmin}
+      />
     </main>
   );
 }

@@ -19,7 +19,7 @@ const menus = [
     icon: LayoutDashboard,
   },
   {
-    title: "Service Reports",
+    title: "Jobs",
     href: "/reports",
     icon: ClipboardList,
   },

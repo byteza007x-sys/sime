@@ -25,8 +25,6 @@ export async function toggleFeatureFlagAction(formData: FormData) {
     throw new Error(locale === "th" ? "ไม่พบระบบนี้" : "Unknown feature.");
   }
 
-  const definition = featureDefinitions.find((feature) => feature.key === key);
-
   await prisma.system_feature_flags.upsert({
     where: {
       flag_key: key,
@@ -37,8 +35,8 @@ export async function toggleFeatureFlagAction(formData: FormData) {
     },
     create: {
       flag_key: key,
-      label: definition?.label ?? key,
-      description: definition?.description ?? null,
+      description:
+        featureDefinitions.find((feature) => feature.key === key)?.description ?? null,
       is_enabled: enabled,
       updated_by: user?.user_id ?? null,
     },

@@ -9,8 +9,8 @@ import {
 
 const actions = [
   {
-    title: "New Service Report",
-    description: "สร้างใบเซอร์วิสใหม่",
+    title: "Create Job",
+    description: "สร้างใบงานใหม่",
     href: "/reports/create",
     icon: Wrench,
     color: "bg-blue-600",
@@ -30,8 +30,8 @@ const actions = [
     color: "bg-orange-500",
   },
   {
-    title: "Reports",
-    description: "ดูรายการใบเซอร์วิสทั้งหมด",
+    title: "Jobs",
+    description: "ดูรายการใบงานทั้งหมด",
     href: "/reports",
     icon: ClipboardList,
     color: "bg-violet-600",

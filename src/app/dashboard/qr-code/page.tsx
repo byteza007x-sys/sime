@@ -37,7 +37,7 @@ const copy = {
     breadcrumbCurrent: "QR Code Generator",
     nav: {
       dashboard: "Dashboard",
-      serviceReports: "Service Reports",
+      serviceReports: "Jobs",
       customers: "Customers",
       inventory: "Inventory",
       users: "Users",

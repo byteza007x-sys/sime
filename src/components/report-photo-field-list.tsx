@@ -15,6 +15,11 @@ interface ReportPhotoFieldListProps {
   originalLabel?: string;
   removeLabel: string;
   tooLargeLabel?: string;
+  workItemLabel?: string;
+  workItemOptions?: Array<{
+    value: number;
+    label: string;
+  }>;
 }
 
 type PhotoStatus = "idle" | "compressing" | "optimized" | "original" | "too-large" | "error";
@@ -110,6 +115,8 @@ export default function ReportPhotoFieldList({
   originalLabel = "Original image",
   removeLabel,
   tooLargeLabel = "Image is larger than 5 MB. Please choose a smaller image.",
+  workItemLabel = "Work item",
+  workItemOptions = [],
 }: ReportPhotoFieldListProps) {
   const [rows, setRows] = useState<PhotoRow[]>([createRow()]);
   const previewUrls = useRef(new Set<string>());
@@ -267,7 +274,7 @@ export default function ReportPhotoFieldList({
           key={row.id}
           className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950"
         >
-          <div className="grid gap-4 lg:grid-cols-[1fr_220px_auto]">
+          <div className="grid gap-4 lg:grid-cols-[1fr_180px_220px_auto]">
             <label className="block">
               <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
                 {captionLabel}
@@ -278,6 +285,23 @@ export default function ReportPhotoFieldList({
                 className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-white px-3 py-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
                 placeholder={captionPlaceholder}
               />
+            </label>
+
+            <label className="block">
+              <span className="text-sm font-bold text-slate-700 dark:text-slate-200">
+                {workItemLabel}
+              </span>
+              <select
+                name="photoItemLineNos"
+                className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
+              >
+                <option value="">-</option>
+                {workItemOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </label>
 
             <label className="block">

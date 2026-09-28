@@ -34,7 +34,7 @@ export default function DashboardCharts({
     <div className="grid gap-6 lg:grid-cols-3">
       <div className="rounded-3xl border bg-white p-6 shadow-sm lg:col-span-2">
         <div className="mb-6">
-          <h2 className="text-xl font-bold">Monthly Service Reports</h2>
+          <h2 className="text-xl font-bold">Monthly Jobs</h2>
           <p className="text-sm text-slate-500">
             จำนวนใบงานแต่ละเดือน
           </p>

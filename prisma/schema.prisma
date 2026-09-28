@@ -68,6 +68,11 @@ model customer_sites {
   site_code         String?             @db.VarChar(50)
   site_name         String?             @db.VarChar(255)
   address           String?             @db.Text
+  house_no          String?             @db.VarChar(80)
+  village_no        String?             @db.VarChar(40)
+  road              String?             @db.VarChar(150)
+  subdistrict       String?             @db.VarChar(100)
+  district          String?             @db.VarChar(100)
   province          String?             @db.VarChar(100)
   postal_code       String?             @db.VarChar(20)
   contact_person    String?             @db.VarChar(150)
@@ -214,6 +219,8 @@ model service_reports {
   report_id                     String                          @id @db.Char(36)
   job_number                    String                          @unique(map: "job_number") @db.VarChar(50)
   project_number                String?                         @db.VarChar(50)
+  quotation_number              String?                         @db.VarChar(50)
+  service_call_number           String?                         @db.VarChar(50)
   customer_id                   Int
   site_id                       Int?
   contact_id                    Int?
@@ -264,6 +271,7 @@ model service_reports {
   service_report_signs          service_report_signatures[]
   service_report_status_history service_report_status_history[]
   service_report_time_logs      service_report_time_logs[]
+  service_report_topics         service_report_topics[]
   satisfaction                  service_report_satisfaction?
   customers                     customers                       @relation(fields: [customer_id], references: [customer_id], onUpdate: Restrict, map: "service_reports_ibfk_1")
   engineers                     engineers                       @relation(fields: [engineer_id], references: [engineer_id], onUpdate: Restrict, map: "service_reports_ibfk_2")
@@ -278,10 +286,19 @@ model service_reports {
   @@index([template_version_id], map: "template_version_id")
 }
 
+model system_feature_flags {
+  flag_key    String    @id @db.VarChar(50)
+  description String?   @db.Text
+  is_enabled  Boolean   @default(false)
+  updated_at  DateTime  @updatedAt @db.DateTime(0)
+  updated_by  String?   @db.Char(36)
+}
+
 model service_report_items {
   item_id         Int             @id @default(autoincrement())
   report_id       String          @db.Char(36)
   line_no         Int
+  service_type    service_reports_service_type?
   service_detail  String?         @db.Text
   amount          Int?            @default(1)
   root_problem    String?         @db.Text
@@ -293,10 +310,21 @@ model service_report_items {
   @@index([report_id], map: "report_id")
 }
 
+model service_report_topics {
+  id              Int                          @id @default(autoincrement())
+  report_id       String                       @db.Char(36)
+  service_type    service_reports_service_type
+  service_reports service_reports              @relation(fields: [report_id], references: [report_id], onDelete: Cascade, onUpdate: Restrict, map: "service_report_topics_ibfk_1")
+
+  @@unique([report_id, service_type], map: "report_id_service_type")
+  @@index([report_id], map: "report_id")
+}
+
 model service_report_assets {
   asset_id              Int                              @id @default(autoincrement())
   report_id             String                           @db.Char(36)
   line_no               Int
+  item_line_no          Int?
   action_type           service_report_asset_action_type
   brand                 String?                          @db.VarChar(100)
   model                 String?                          @db.VarChar(100)
@@ -319,6 +347,7 @@ model service_report_photos {
   report_id             String                    @db.Char(36)
   file_id               Int?
   photo_type            service_report_photo_type
+  item_line_no          Int?
   file_url              String                    @db.VarChar(255)
   caption               String?                   @db.VarChar(255)
   gps_lat               Decimal?                  @db.Decimal(10, 8)

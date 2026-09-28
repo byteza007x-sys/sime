@@ -1,7 +1,7 @@
-import Image from "next/image";
+/* eslint-disable @next/next/no-img-element */
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Clock3, FileText, PenLine, RotateCcw, XCircle } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Clock3, FileText, PenLine } from "lucide-react";
 import PrintButton from "@/components/print-button";
 import { requireUser } from "@/lib/auth";
 import { requireFeature } from "@/lib/features";
@@ -14,9 +14,10 @@ export const dynamic = "force-dynamic";
 
 const copy = {
   en: {
-    backReports: "Service Reports",
+    backReports: "Jobs",
     editWork: "Back to edit",
     print: "Print / Save PDF",
+    snapshot: "Open snapshot",
     reviewTitle: "Review service report",
     reviewNote: "Review note",
     reviewPlaceholder: "Optional note for technician or admin records...",
@@ -65,7 +66,6 @@ const copy = {
     communication: "Courtesy & Communication",
     solution: "Problem Resolution & Quality",
     overall: "Overall Satisfaction",
-    nps: "Net Promoter Score",
     comment: "Comment",
     engineerSignature: "On site service by",
     customerSignature: "Customer",
@@ -78,6 +78,7 @@ const copy = {
     backReports: "ใบเซอร์วิซ",
     editWork: "กลับไปแก้ไข",
     print: "พิมพ์ / บันทึก PDF",
+    snapshot: "เปิด snapshot",
     reviewTitle: "ตรวจสอบใบเซอร์วิซ",
     reviewNote: "หมายเหตุการตรวจสอบ",
     reviewPlaceholder: "หมายเหตุถึงช่างหรือบันทึกสำหรับแอดมิน ถ้ามี...",
@@ -126,7 +127,6 @@ const copy = {
     communication: "ความสุภาพ มารยาท และการสื่อสาร",
     solution: "ผลการแก้ไขปัญหา / คุณภาพงาน",
     overall: "ความพึงพอใจโดยรวมต่อการบริการ",
-    nps: "คะแนนแนะนำบริการ",
     comment: "ข้อเสนอแนะ",
     engineerSignature: "ผู้ให้บริการ",
     customerSignature: "ลูกค้า",
@@ -191,70 +191,68 @@ const serviceTypeLabel = (
 };
 
 type ReportAssetRow = {
+  item_line_no: number | null;
   action_type: string;
   brand: string | null;
   model: string | null;
-  amount: number | null;
   serial_number: string | null;
   installation_point: string | null;
   return_reason: string | null;
 };
 
-type GroupedAssetRow = {
-  equipment: string;
-  amount: number;
-  detail: string;
-};
-
-const groupAssetRows = (assets: ReportAssetRow[], fallback: string): GroupedAssetRow[] => {
-  const groups = new Map<
+const summarizeAssetsForItem = (
+  assets: ReportAssetRow[],
+  itemLineNo: number,
+  fallback: string,
+) => {
+  const matchingAssets = assets.filter((asset) => asset.item_line_no === itemLineNo);
+  const rows = matchingAssets.length > 0 ? matchingAssets : [];
+  const grouped = new Map<
     string,
     {
+      actionType: string;
       equipment: string;
-      amount: number;
       installationPoint: string | null;
       returnReason: string | null;
       serialNumbers: string[];
     }
   >();
 
-  for (const asset of assets) {
+  for (const asset of rows) {
     const equipment = [asset.brand, asset.model].filter(Boolean).join(" / ") || fallback;
-    const installationPoint = asset.installation_point || null;
-    const returnReason = asset.return_reason || null;
     const key = [
       asset.action_type,
       equipment,
-      installationPoint ?? "",
-      returnReason ?? "",
+      asset.installation_point || "",
+      asset.return_reason || "",
     ].join("\u001f");
     const current =
-      groups.get(key) ??
+      grouped.get(key) ??
       {
+        actionType: asset.action_type,
         equipment,
-        amount: 0,
-        installationPoint,
-        returnReason,
+        installationPoint: asset.installation_point || null,
+        returnReason: asset.return_reason || null,
         serialNumbers: [],
       };
 
-    current.amount += asset.amount || 1;
     if (asset.serial_number) current.serialNumbers.push(asset.serial_number);
-    groups.set(key, current);
+    grouped.set(key, current);
   }
 
-  return Array.from(groups.values()).map((group) => {
-    const serialText = group.serialNumbers.length > 0 ? group.serialNumbers.join("\n") : null;
-    const detail = [group.installationPoint, serialText, group.returnReason]
+  const summary = Array.from(grouped.values()).map((group) =>
+    [
+      group.actionType,
+      group.equipment,
+      group.installationPoint,
+      group.serialNumbers.length > 0 ? `S/N: ${group.serialNumbers.join(", ")}` : null,
+      group.returnReason,
+    ]
       .filter(Boolean)
-      .join(" / ");
+      .join(" / "),
+  );
 
-    return {
-      equipment: group.equipment,
-      amount: group.amount,
-      detail: detail || fallback,
-    };
-  });
+  return summary.length > 0 ? summary.join("\n") : fallback;
 };
 
 const statusTone = (status: string | null) => {
@@ -325,9 +323,17 @@ export default async function ServiceFormPage({
           created_at: "asc",
         },
       },
+      service_report_attachments: {
+        include: {
+          uploaded_files: true,
+        },
+        orderBy: {
+          created_at: "desc",
+        },
+      },
       service_report_topics: {
         orderBy: {
-          topic_id: "asc",
+          id: "asc",
         },
       },
       service_report_status_history: {
@@ -395,15 +401,10 @@ export default async function ServiceFormPage({
   const engineerSignature =
     report.service_report_signs.find((sign) => sign.signer_type === "Engineer") ??
     null;
-  const installedAssets = report.service_report_assets.filter(
-    (asset) => asset.action_type !== "Returned",
-  );
-  const returnedAssets = report.service_report_assets.filter(
-    (asset) => asset.action_type === "Returned",
-  );
-  const groupedInstalledAssets = groupAssetRows(installedAssets, t.noData);
-  const groupedReturnedAssets = groupAssetRows(returnedAssets, t.noData);
   const serviceItems = report.service_report_items;
+  const latestSnapshot = report.service_report_attachments.find((attachment) =>
+    attachment.uploaded_files?.file_url.includes("/service-snapshots/"),
+  );
 
   return (
     <main className="service-print-bg min-h-screen bg-slate-100 px-4 py-5 text-slate-950 sm:px-6">
@@ -417,9 +418,18 @@ export default async function ServiceFormPage({
             {t.backReports}
           </Link>
           <div className="flex flex-col gap-2 sm:flex-row">
+            {latestSnapshot?.uploaded_files?.file_url ? (
+              <Link
+                href={latestSnapshot.uploaded_files.file_url}
+                className="interactive-button inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 text-sm font-bold text-emerald-700 hover:bg-emerald-100"
+              >
+                <FileText size={16} />
+                {t.snapshot}
+              </Link>
+            ) : null}
             <Link
               href={withLocale(`/reports/${report.report_id}/work`, locale)}
-              className="interactive-button inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-blue-200 px-4 text-sm font-bold text-blue-700 hover:bg-blue-50"
+              className="interactive-button inline-flex h-11 items-center justify-center gap-2 rounded-lg border border-blue-200 px-4 text-sm font-bold text-blue-700 hover:bg-blue-50"
             >
               <PenLine size={16} />
               {t.editWork}
@@ -474,26 +484,6 @@ export default async function ServiceFormPage({
                 <CheckCircle2 size={16} />
                 {t.approve}
               </button>
-              <button
-                type="submit"
-                name="reviewAction"
-                value="Need_Revision"
-                disabled={!canReview}
-                className="interactive-button inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-bold text-rose-700 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <RotateCcw size={16} />
-                {t.needRevision}
-              </button>
-              <button
-                type="submit"
-                name="reviewAction"
-                value="Closed"
-                disabled={!canReview}
-                className="interactive-button inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <XCircle size={16} />
-                {t.closeJob}
-              </button>
             </div>
           </form>
         </section>
@@ -546,12 +536,10 @@ export default async function ServiceFormPage({
         <div className="mb-3 flex items-start justify-between gap-4">
           <div className="flex gap-3">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg border border-slate-300">
-              <Image
+              <img
                 src="/logo.png"
                 alt="e service logo"
-                width={34}
-                height={34}
-                priority
+                className="h-[34px] w-[34px] object-contain"
               />
             </div>
             <div>
@@ -605,39 +593,25 @@ export default async function ServiceFormPage({
         </div>
 
         <TableBlock
-          title={t.detailsTitle}
-          headers={[t.no, t.serviceCall, t.amount, t.detail, t.problemResolution]}
+          title={locale === "th" ? "รายละเอียดงานและอุปกรณ์" : "Work details and equipment"}
+          headers={[
+            t.no,
+            locale === "th" ? "หัวข้องาน" : "Work topic",
+            locale === "th" ? "ไปทำอะไร" : "Work detail",
+            locale === "th" ? "ซ่อมอะไร" : "Repair detail",
+            locale === "th" ? "เอาอะไรไป/กลับ" : "Equipment delivered/returned",
+          ]}
           rows={serviceItems.map((item, index) => [
             String(index + 1),
             serviceTypeLabel(item.service_type, locale, t.noData),
-            String(item.amount || 1),
             item.service_detail || t.noData,
             [item.root_problem, item.resolution].filter(Boolean).join(" / ") ||
               t.noData,
-          ])}
-          minRows={0}
-        />
-
-        <TableBlock
-          title={t.installedTitle}
-          headers={[t.no, t.equipment, t.amount, t.serialInstall]}
-          rows={groupedInstalledAssets.map((asset, index) => [
-            String(index + 1),
-            asset.equipment,
-            String(asset.amount),
-            asset.detail,
-          ])}
-          minRows={0}
-        />
-
-        <TableBlock
-          title={t.returnedTitle}
-          headers={[t.no, t.equipment, t.amount, t.serialReturn]}
-          rows={groupedReturnedAssets.map((asset, index) => [
-            String(index + 1),
-            asset.equipment,
-            String(asset.amount),
-            asset.detail,
+            summarizeAssetsForItem(
+              report.service_report_assets,
+              item.line_no,
+              t.noData,
+            ),
           ])}
           minRows={0}
         />
@@ -676,13 +650,10 @@ export default async function ServiceFormPage({
                 <div key={photo.photo_id}>
                   <div className="service-photo-frame relative h-24 border border-slate-300 bg-white">
                     {photoUrl ? (
-                      <Image
+                      <img
                         src={photoUrl}
                         alt={`${photo.photo_type} photo`}
-                        fill
-                        sizes="180px"
-                        className="object-contain"
-                        unoptimized
+                        className="h-full w-full object-contain"
                       />
                     ) : null}
                   </div>
@@ -695,38 +666,6 @@ export default async function ServiceFormPage({
             </div>
           </div>
         ) : null}
-
-        <div className="service-rating-section mt-3 border border-slate-500">
-          <div className="bg-slate-800 px-3 py-2 text-sm font-bold text-white print:px-2 print:py-1 print:text-[10px]">
-            {t.satisfaction}
-          </div>
-          <div className="grid grid-cols-[1fr_120px] gap-0">
-            {[
-              [t.responsiveness, report.satisfaction?.responsiveness_score],
-              [t.knowledge, report.satisfaction?.staff_knowledge_score],
-              [t.communication, report.satisfaction?.service_quality_score],
-              [t.solution, report.satisfaction?.problem_solution_score],
-              [t.overall, report.satisfaction?.overall_score],
-            ].map(([label, score]) => (
-              <div key={String(label)} className="contents">
-                <div className="border-b border-slate-300 px-3 py-2">{label}</div>
-                <div className="border-b border-slate-300 px-3 py-2 text-right text-slate-500">
-                  {scoreStars(Number(score || 0))}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="grid grid-cols-[150px_1fr] border-b border-slate-300">
-            <div className="px-3 py-2 font-bold">{t.nps}</div>
-            <div className="px-3 py-2">{report.satisfaction?.nps_score ?? t.noData}</div>
-          </div>
-          <div className="grid grid-cols-[150px_1fr]">
-            <div className="px-3 py-2 font-bold">{t.comment}</div>
-            <div className="px-3 py-2">
-              {report.satisfaction?.customer_comment || t.noData}
-            </div>
-          </div>
-        </div>
 
         <div className="service-signature-grid mt-5 grid grid-cols-2 gap-5">
           <SignatureBox
@@ -753,6 +692,41 @@ export default async function ServiceFormPage({
             printNameLabel={t.printName}
             positionLabel={t.position}
           />
+        </div>
+
+        <div className="service-rating-section mt-3 border border-slate-500">
+          <div className="bg-slate-800 px-3 py-2 text-sm font-bold text-white print:px-2 print:py-1 print:text-[10px]">
+            {t.satisfaction}
+          </div>
+          <div className="grid grid-cols-[1fr_120px] gap-0">
+            {[
+              [
+                locale === "th"
+                  ? "การตรงต่อเวลา มารยาท ความสะอาด"
+                  : "Punctuality, courtesy, cleanliness",
+                report.satisfaction?.responsiveness_score,
+              ],
+              [
+                locale === "th"
+                  ? "การแก้ไขปัญหาอย่างถูกต้อง"
+                  : "Correct problem resolution",
+                report.satisfaction?.problem_solution_score,
+              ],
+            ].map(([label, score]) => (
+              <div key={String(label)} className="contents">
+                <div className="border-b border-slate-300 px-3 py-2">{label}</div>
+                <div className="border-b border-slate-300 px-3 py-2 text-right text-slate-500">
+                  {scoreStars(Number(score || 0))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="grid grid-cols-[150px_1fr]">
+            <div className="px-3 py-2 font-bold">{t.comment}</div>
+            <div className="px-3 py-2">
+              {report.satisfaction?.customer_comment || t.noData}
+            </div>
+          </div>
         </div>
 
         <div className="service-footer mt-5 bg-slate-800 px-4 py-2 text-center text-xs font-semibold text-white">
@@ -897,13 +871,10 @@ function SignatureBox({
     <div className="text-center">
       <div className="service-signature-image relative mb-2 h-24 rounded-lg border border-slate-300">
         {normalizedImageUrl ? (
-          <Image
+          <img
             src={normalizedImageUrl}
             alt={`${title} signature`}
-            fill
-            sizes="320px"
-            className="object-contain p-2"
-            unoptimized
+            className="h-full w-full object-contain p-2"
           />
         ) : null}
       </div>

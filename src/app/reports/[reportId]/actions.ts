@@ -10,7 +10,8 @@ import { prisma } from "@/lib/prisma";
 const readText = (formData: FormData, key: string) =>
   String(formData.get(key) ?? "").trim();
 
-const closedStatuses = new Set(["Approved", "Closed", "Cancelled"]);
+const activeAssignmentStatuses = new Set(["Assigned", "Accepted"]);
+const closedStatuses = new Set(["Approved", "Closed", "Completed", "Cancelled"]);
 
 const reportHref = (reportId: string, locale: "en" | "th", query = "") =>
   `${withLocale(`/reports/${reportId}`, locale)}${query}`;
@@ -23,9 +24,21 @@ export async function assignServiceReportAction(formData: FormData) {
   const reportId = readText(formData, "reportId");
   const assigneeUserId = readText(formData, "assigneeUserId");
   const note = readText(formData, "assignmentNote");
+  const returnTo = readText(formData, "returnTo");
+  const returnHref = (query = "") => {
+    const suffix = query ? `&${query.replace(/^[?&]/, "")}` : "";
+
+    if (returnTo === "report_work") {
+      return `${withLocale(`/reports/${reportId}/work`, locale)}${suffix}`;
+    }
+
+    return returnTo === "technician_jobs"
+      ? `${withLocale("/technician/jobs", locale)}${suffix}`
+      : reportHref(reportId, locale, suffix);
+  };
 
   if (!reportId) redirect(withLocale("/reports", locale));
-  if (!assigneeUserId) redirect(reportHref(reportId, locale, "&assign_error=user"));
+  if (!assigneeUserId) redirect(returnHref("?assign_error=user"));
 
   const [report, assignee] = await Promise.all([
     prisma.service_reports.findUnique({
@@ -39,6 +52,7 @@ export async function assignServiceReportAction(formData: FormData) {
             users: true,
           },
         },
+        service_report_assignments: true,
       },
     }),
     prisma.users.findUnique({
@@ -58,13 +72,21 @@ export async function assignServiceReportAction(formData: FormData) {
 
   if (!report) redirect(withLocale("/reports/create", locale));
   if (closedStatuses.has(String(report.status))) {
-    redirect(reportHref(reportId, locale, "&assign_error=locked"));
+    redirect(returnHref("?assign_error=locked"));
   }
 
+  const currentEngineerIds = user.engineers.map((engineer) => engineer.engineer_id);
   const isAdmin = user.roles.role_name === "admin";
   const isCreator = report.created_by === user.user_id;
-  if (!isAdmin && !isCreator) {
-    redirect(reportHref(reportId, locale, "&assign_error=permission"));
+  const isAssignedEngineer = currentEngineerIds.includes(report.engineer_id);
+  const isAssignedByAssignment = report.service_report_assignments.some(
+    (assignment) =>
+      currentEngineerIds.includes(assignment.engineer_id) &&
+      activeAssignmentStatuses.has(String(assignment.status)),
+  );
+
+  if (!isAdmin && !isCreator && !isAssignedEngineer && !isAssignedByAssignment) {
+    redirect(returnHref("?assign_error=permission"));
   }
 
   if (
@@ -72,7 +94,7 @@ export async function assignServiceReportAction(formData: FormData) {
     !assignee.is_active ||
     !["admin", "support", "user"].includes(assignee.roles.role_name)
   ) {
-    redirect(reportHref(reportId, locale, "&assign_error=user"));
+    redirect(returnHref("?assign_error=user"));
   }
 
   const now = new Date();
@@ -178,14 +200,14 @@ export async function assignServiceReportAction(formData: FormData) {
         from_status: report.status,
         to_status: nextStatus,
         changed_by: user.user_id,
-        note: note || `Assigned to ${assigneeName}`,
+        note: note || `Transferred to ${assigneeName}`,
       },
     });
 
     await tx.audit_logs.create({
       data: {
         user_id: user.user_id,
-        action: "assign_service_report",
+        action: "transfer_service_report",
         table_name: "service_reports",
         record_id: reportId,
         old_data: JSON.stringify({
@@ -203,7 +225,7 @@ export async function assignServiceReportAction(formData: FormData) {
       data: {
         user_id: assignee.user_id,
         notification_type: "Job_Assigned",
-        title: `Assigned service report: ${report.job_number}`,
+        title: `Transferred service job: ${report.job_number}`,
         body: `${report.customers.company_name}${note ? ` - ${note}` : ""}`,
         link_url: withLocale(`/reports/${reportId}/work`, locale),
       },
@@ -216,5 +238,5 @@ export async function assignServiceReportAction(formData: FormData) {
   revalidatePath(`/reports/${reportId}`);
   revalidatePath(`/reports/${reportId}/work`);
   revalidatePath(`/reports/${reportId}/service-form`);
-  redirect(reportHref(reportId, locale, "&assigned=1"));
+  redirect(returnHref("?assigned=1"));
 }

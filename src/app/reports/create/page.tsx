@@ -28,25 +28,25 @@ export const dynamic = "force-dynamic";
 
 const copy = {
   en: {
-    backReports: "Service Reports",
-    title: "Create Service Report",
+    backReports: "Service Jobs",
+    title: "Create Job",
     subtitle: "Create the job header first. The technician can fill work details, photos, GPS, and signatures after opening the job.",
     controls: "Language and display",
     customerSection: "Customer information",
     jobSection: "Job details",
-    engineerSection: "Engineer assignment",
+    engineerSection: "Job transfer / responsible user",
     customer: "Customer",
     site: "Site",
     contact: "Contact person",
-    selectEngineer: "Select engineer",
+    selectEngineer: "Select responsible user",
     serviceType: "Service type",
     priority: "Priority",
     projectNumber: "Project number",
     scheduledDate: "Scheduled date",
     dueDate: "Due date",
     dueDateTime: "Due date / time",
-    engineer: "Engineer",
-    submit: "Create service report",
+    engineer: "Responsible user",
+    submit: "Create Job",
     required: "Required",
     optional: "Optional",
     unavailableTitle: "Master data is not ready",
@@ -56,11 +56,11 @@ const copy = {
     guide: [
       "The system generates a job number automatically.",
       "Users open the job to fill service details and collect customer signature.",
-      "Submitted jobs wait for admin review, close, or return.",
+      "Submitted jobs wait for admin approval.",
       "Status history and audit log are recorded automatically.",
     ],
     error: {
-      required: "Please choose a customer and engineer.",
+      required: "Please choose a customer and responsible user.",
       serviceType: "Service type is invalid.",
       priority: "Priority is invalid.",
       site: "Selected site does not belong to the selected customer.",
@@ -80,26 +80,26 @@ const copy = {
     },
   },
   th: {
-    backReports: "ใบเซอร์วิซ",
-    title: "สร้างใบเซอร์วิซ",
+    backReports: "ใบงาน",
+    title: "สร้างงาน",
     subtitle:
       "สร้างหัวใบงานก่อน จากนั้นผู้ใช้หรือช่างค่อยเข้าไปกรอกรายละเอียดงาน รูปภาพ พิกัด และลายเซ็นลูกค้า",
     controls: "ภาษาและการแสดงผล",
     customerSection: "ข้อมูลลูกค้า",
     jobSection: "ข้อมูลงาน",
-    engineerSection: "มอบหมายช่าง",
+    engineerSection: "ส่งต่องาน / ผู้รับผิดชอบ",
     customer: "ลูกค้า",
     site: "สถานที่",
     contact: "ผู้ติดต่อ",
-    selectEngineer: "เลือกช่าง",
+    selectEngineer: "เลือกผู้รับผิดชอบ",
     serviceType: "ประเภทงาน",
     priority: "ความสำคัญ",
     projectNumber: "เลขที่โปรเจกต์",
     scheduledDate: "วันที่เริ่ม",
     dueDate: "กำหนดส่ง",
     dueDateTime: "กำหนดวันเวลา",
-    engineer: "ช่างผู้รับผิดชอบ",
-    submit: "สร้างใบเซอร์วิซ",
+    engineer: "ผู้รับผิดชอบ",
+    submit: "สร้างงาน",
     required: "จำเป็น",
     optional: "ไม่บังคับ",
     unavailableTitle: "ข้อมูลพื้นฐานยังไม่พร้อม",
@@ -109,11 +109,11 @@ const copy = {
     guide: [
       "ระบบจะออกเลขใบงานให้อัตโนมัติ",
       "ผู้ใช้เปิดใบงานเพื่อกรอกรายละเอียดและให้ลูกค้าเซ็นได้ทันที",
-      "งานที่ส่งแล้วจะรอ admin ตรวจ ปิดงาน หรือส่งกลับให้แก้ไข",
+      "งานที่ส่งแล้วจะรอ admin อนุมัติ",
       "ระบบบันทึกประวัติสถานะและ audit log ให้อัตโนมัติ",
     ],
     error: {
-      required: "กรุณาเลือกลูกค้าและช่าง",
+      required: "กรุณาเลือกลูกค้าและผู้รับผิดชอบ",
       serviceType: "ประเภทงานไม่ถูกต้อง",
       priority: "ความสำคัญไม่ถูกต้อง",
       site: "สถานที่ที่เลือกไม่ได้อยู่ภายใต้ลูกค้าที่เลือก",
@@ -325,7 +325,7 @@ export default async function CreateReportPage({
                 <ReportReferenceFields
                   locale={locale}
                   referenceTypeLabel={
-                    locale === "th" ? "ประเภทเลขอ้างอิง" : "Reference type"
+                    locale === "th" ? "เลขอ้างอิงงาน" : "Job Reference"
                   }
                   quotationLabel={
                     locale === "th" ? "เลขที่ใบเสนอราคา" : "Quotation number"

@@ -41,7 +41,7 @@ export default function RecentReports({ reports }: RecentReportsProps) {
         <div>
           <h2 className="flex items-center gap-2 text-xl font-bold">
             <ClipboardList className="text-blue-600" size={22} />
-            Recent Service Reports
+            Recent Jobs
           </h2>
           <p className="mt-1 text-sm text-slate-500">
             รายการใบ Service ล่าสุด

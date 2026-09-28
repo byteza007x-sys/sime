@@ -45,7 +45,7 @@ type ServiceReportStatus =
 
 const copy = {
   en: {
-    backReports: "Service Reports",
+    backReports: "Jobs",
     title: "Service Job Detail",
     subtitle: "One place to view status, continue work, review, and print the service form.",
     controls: "Language and display",
@@ -54,7 +54,7 @@ const copy = {
     customerInfo: "Customer",
     jobInfo: "Job information",
     workSummary: "Work summary",
-    evidence: "Evidence",
+    evidence: "Records",
     timeline: "Status history",
     changedBy: "Changed by",
     jobNo: "Job No.",
@@ -71,7 +71,7 @@ const copy = {
     address: "Address",
     contact: "Contact",
     phone: "Phone",
-    engineer: "Engineer",
+    engineer: "Responsible user",
     problem: "Problem / request",
     serviceDetail: "Service detail",
     rootProblem: "Root problem",
@@ -91,7 +91,7 @@ const copy = {
     needsWorkTitle: "Technician should complete the service work.",
     needsWorkDetail: "Fill work details, capture location, and collect customer signature.",
     reviewTitle: "Admin should review the submitted service form.",
-    reviewDetail: "Check the A4 service form, then approve, request revision, or close the job.",
+    reviewDetail: "Check the A4 service form, then approve the job.",
     revisionTitle: "Technician needs to revise this work.",
     revisionDetail: "Open the work form, update the details, and submit again.",
     completedTitle: "This job is ready for PDF or archive.",
@@ -105,11 +105,11 @@ const copy = {
       In_Progress: "In Progress",
       On_Site: "On Site",
       Pending_Customer: "Pending Customer",
-      Submitted: "Waiting review",
-      Need_Revision: "Need revision",
-      Completed: "Completed",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
       Approved: "Approved",
-      Closed: "Closed",
+      Closed: "Approved",
       Cancelled: "Cancelled",
       Unknown: "Unknown",
     },
@@ -124,7 +124,7 @@ const copy = {
     customerInfo: "ข้อมูลลูกค้า",
     jobInfo: "ข้อมูลงาน",
     workSummary: "สรุปงาน",
-    evidence: "หลักฐาน",
+    evidence: "รายการบันทึก",
     timeline: "ประวัติสถานะ",
     changedBy: "ผู้ดำเนินการ",
     jobNo: "เลขที่งาน",
@@ -141,7 +141,7 @@ const copy = {
     address: "ที่อยู่",
     contact: "ผู้ติดต่อ",
     phone: "เบอร์โทร",
-    engineer: "ช่าง",
+    engineer: "ผู้รับผิดชอบ",
     problem: "ปัญหา / งานที่ต้องการ",
     serviceDetail: "รายละเอียดการให้บริการ",
     rootProblem: "สาเหตุของปัญหา",
@@ -161,7 +161,7 @@ const copy = {
     needsWorkTitle: "ช่างควรกรอกและส่งงาน",
     needsWorkDetail: "กรอกรายละเอียดงาน เก็บตำแหน่ง และให้ลูกค้าเซ็นรับงาน",
     reviewTitle: "แอดมินควรตรวจสอบใบ Service",
-    reviewDetail: "ตรวจใบ A4 แล้วเลือกอนุมัติ ส่งกลับแก้ไข หรือปิดงาน",
+    reviewDetail: "ตรวจใบ A4 แล้วอนุมัติงาน",
     revisionTitle: "งานนี้ต้องให้ช่างแก้ไข",
     revisionDetail: "เปิดฟอร์มงาน แก้รายละเอียด แล้วส่งงานอีกครั้ง",
     completedTitle: "งานนี้พร้อมพิมพ์ PDF หรือจัดเก็บ",
@@ -175,11 +175,11 @@ const copy = {
       In_Progress: "กำลังดำเนินการ",
       On_Site: "ถึงหน้างาน",
       Pending_Customer: "รอลูกค้า",
-      Submitted: "รอตรวจสอบ",
-      Need_Revision: "ต้องแก้ไข",
-      Completed: "เสร็จสิ้น",
-      Approved: "อนุมัติแล้ว",
-      Closed: "ปิดงาน",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
+      Approved: "Approved",
+      Closed: "Approved",
       Cancelled: "ยกเลิก",
       Unknown: "ไม่ทราบสถานะ",
     },
@@ -188,38 +188,38 @@ const copy = {
 
 const assignmentCopy = {
   en: {
-    title: "Assign / hand off job",
+    title: "Job Transfer",
     description:
-      "Admin or the job creator can assign this service report to another active user.",
+      "Admin or the job creator can transfer this job to another active user.",
     current: "Current responsible person",
     selectUser: "Select user",
     note: "Note",
     notePlaceholder: "Optional note for the next person...",
-    submit: "Assign job",
-    success: "Job assignment updated.",
-    permission: "Only admin or the job creator can assign this job.",
-    locked: "Closed, approved, or cancelled jobs cannot be reassigned.",
-    error: "Could not assign this job. Please check the selected user.",
-    history: "Assignment history",
-    noHistory: "No assignment history yet.",
-    assignedBy: "Assigned by",
+    submit: "Transfer job",
+    success: "Job transfer updated.",
+    permission: "Only admin or the job creator can transfer this job.",
+    locked: "Approved or cancelled jobs cannot be transferred.",
+    error: "Could not transfer this job. Please check the selected user.",
+    history: "Transfer audit trail",
+    noHistory: "No transfer history yet.",
+    assignedBy: "Transferred by",
   },
   th: {
-    title: "มอบหมาย / ส่งต่องาน",
+    title: "Job Transfer",
     description:
       "แอดมินหรือผู้เปิดใบงานสามารถส่งงานนี้ให้ผู้ใช้งานคนอื่นรับต่อได้",
     current: "ผู้รับผิดชอบปัจจุบัน",
     selectUser: "เลือกผู้รับงาน",
     note: "หมายเหตุ",
     notePlaceholder: "ใส่หมายเหตุให้คนรับงานถ้ามี...",
-    submit: "มอบหมายงาน",
-    success: "อัปเดตผู้รับงานเรียบร้อยแล้ว",
-    permission: "เฉพาะแอดมินหรือผู้เปิดใบงานเท่านั้นที่มอบหมายงานได้",
-    locked: "งานที่อนุมัติ ปิดงาน หรือยกเลิกแล้ว ไม่สามารถส่งต่อได้",
-    error: "มอบหมายงานไม่สำเร็จ กรุณาตรวจสอบผู้รับงาน",
-    history: "ประวัติการมอบหมาย",
-    noHistory: "ยังไม่มีประวัติการมอบหมาย",
-    assignedBy: "มอบหมายโดย",
+    submit: "ส่งต่องาน",
+    success: "อัปเดตการส่งต่องานเรียบร้อยแล้ว",
+    permission: "เฉพาะแอดมินหรือผู้เปิดใบงานเท่านั้นที่ส่งต่องานได้",
+    locked: "งานที่อนุมัติหรือยกเลิกแล้ว ไม่สามารถส่งต่อได้",
+    error: "ส่งต่องานไม่สำเร็จ กรุณาตรวจสอบผู้รับงาน",
+    history: "Transfer audit trail",
+    noHistory: "ยังไม่มีประวัติส่งต่อ",
+    assignedBy: "ส่งต่อโดย",
   },
 } satisfies Record<Locale, Record<string, string>>;
 
@@ -381,7 +381,7 @@ export default async function ReportDetailPage({
       },
       service_report_topics: {
         orderBy: {
-          topic_id: "asc",
+          id: "asc",
         },
       },
       service_report_places: {
@@ -472,7 +472,8 @@ export default async function ReportDetailPage({
       activeAssignmentStatuses.has(String(assignment.status)),
   );
   const isCreator = report.created_by === currentUser.user_id;
-  const canAssignReport = isAdminLike || isCreator;
+  const canAssignReport =
+    isAdminLike || isCreator || isAssignedEngineer || isAssignedByAssignment;
   const assignmentT = assignmentCopy[locale];
   const assignResult = Array.isArray(rawSearchParams.assigned)
     ? rawSearchParams.assigned[0]

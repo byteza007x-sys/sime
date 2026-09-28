@@ -7,7 +7,6 @@ import {
   ClipboardList,
   Home,
   LifeBuoy,
-  Menu,
   QrCode,
   Settings,
   Sparkles,
@@ -18,6 +17,7 @@ import {
 import BrandLogo from "@/components/brand-logo";
 import DashboardAnalytics from "@/components/dashboard-analytics";
 import LanguageSwitcher from "@/components/language-switcher";
+import MobileBottomNav from "@/components/mobile-bottom-nav";
 import NotificationBell from "@/components/notification-bell";
 import NotificationInbox from "@/components/notification-inbox";
 import ThemeToggle from "@/components/theme-toggle";
@@ -50,12 +50,12 @@ const copy = {
     admin: "Admin",
     title: "Command Dashboard",
     subtitle: "Live service operations, SAP imports, review queue, and system health.",
-    newJob: "New Service",
+    newJob: "Create Job",
     logout: "Logout",
     logo: "e service",
     nav: {
       dashboard: "Dashboard",
-      serviceReports: "Service Reports",
+      serviceReports: "Jobs",
       customers: "Customers",
       inventory: "Inventory",
       qrCode: "Create QR Code",
@@ -63,7 +63,7 @@ const copy = {
       users: "Users",
     },
     kpi: {
-      totalJobs: "Total Jobs",
+      totalJobs: "Total Job",
       customers: "Customers",
       users: "Users",
       equipment: "Serials",
@@ -71,17 +71,17 @@ const copy = {
     charts: {
       jobsByMonth: "Jobs in the last 6 months",
       statusMix: "Workload status mix",
-      open: "Open",
-      inProgress: "In Progress",
-      inReview: "In Review",
+      open: "Active",
+      inProgress: "In Progress Jobs",
+      inReview: "Submitted",
       rework: "Rework",
-      closed: "Closed",
+      closed: "Approved",
     },
     recent: {
       title: "Recent Jobs",
       viewAll: "View All",
       empty: "No service jobs yet",
-      latest: "Latest Service Reports",
+      latest: "Latest Jobs",
       jobNo: "Job No.",
       customer: "Customer",
       owner: "Owner",
@@ -126,11 +126,11 @@ const copy = {
       In_Progress: "In Progress",
       On_Site: "On Site",
       Pending_Customer: "Pending Customer",
-      Submitted: "Waiting Review",
-      Need_Revision: "Need Revision",
-      Completed: "Completed",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
       Approved: "Approved",
-      Closed: "Closed",
+      Closed: "Approved",
       Cancelled: "Cancelled",
       Unknown: "Unknown",
     },
@@ -186,7 +186,7 @@ const copy = {
       users: "ผู้ใช้",
     },
     kpi: {
-      totalJobs: "ใบงานทั้งหมด",
+      totalJobs: "Total Job",
       customers: "ลูกค้า",
       users: "ผู้ใช้",
       equipment: "Serial ทั้งหมด",
@@ -194,11 +194,11 @@ const copy = {
     charts: {
       jobsByMonth: "ใบงาน 6 เดือนล่าสุด",
       statusMix: "สัดส่วนสถานะงาน",
-      open: "เปิดงาน",
-      inProgress: "กำลังทำ",
-      inReview: "รอตรวจ",
+      open: "Active",
+      inProgress: "In Progress Jobs",
+      inReview: "Submitted",
       rework: "ส่งกลับแก้",
-      closed: "ปิดงาน",
+      closed: "Approved",
     },
     recent: {
       title: "งานล่าสุด",
@@ -249,11 +249,11 @@ const copy = {
       In_Progress: "กำลังทำ",
       On_Site: "ถึงหน้างาน",
       Pending_Customer: "รอลูกค้า",
-      Submitted: "รอตรวจ",
-      Need_Revision: "ต้องแก้ไข",
-      Completed: "เสร็จสิ้น",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
       Approved: "ตรวจแล้ว",
-      Closed: "ปิดงาน",
+      Closed: "Approved",
       Cancelled: "ยกเลิก",
       Unknown: "ไม่ทราบ",
     },
@@ -306,7 +306,7 @@ const thaiCopy = {
     users: "ผู้ใช้",
   },
   kpi: {
-    totalJobs: "ใบงานทั้งหมด",
+    totalJobs: "Total Job",
     customers: "ลูกค้า",
     users: "ผู้ใช้",
     equipment: "Serial ทั้งหมด",
@@ -314,11 +314,11 @@ const thaiCopy = {
   charts: {
     jobsByMonth: "ใบงาน 6 เดือนล่าสุด",
     statusMix: "สัดส่วนสถานะงาน",
-    open: "เปิดงาน",
-    inProgress: "กำลังทำ",
-    inReview: "รอตรวจ",
+    open: "Active",
+    inProgress: "In Progress Jobs",
+    inReview: "Submitted",
     rework: "ส่งกลับแก้",
-    closed: "ปิดงาน",
+    closed: "Approved",
   },
   recent: {
     title: "งานล่าสุด",
@@ -369,11 +369,11 @@ const thaiCopy = {
     In_Progress: "กำลังทำ",
     On_Site: "ถึงหน้างาน",
     Pending_Customer: "รอลูกค้า",
-    Submitted: "รอตรวจ",
-    Need_Revision: "ต้องแก้ไข",
-    Completed: "เสร็จสิ้น",
+    Submitted: "Submitted",
+    Need_Revision: "Active",
+    Completed: "Approved",
     Approved: "ตรวจแล้ว",
-    Closed: "ปิดงาน",
+    Closed: "Approved",
     Cancelled: "ยกเลิก",
     Unknown: "ไม่ทราบ",
   },
@@ -513,6 +513,40 @@ export default async function DashboardPage({
   void cleanInventorySyncLabels;
 
   const now = new Date();
+  const readRangeNumber = (key: string, fallback: number) => {
+    const rawValue = Array.isArray(params[key]) ? params[key]?.[0] : params[key];
+    const value = Number(rawValue);
+
+    return Number.isInteger(value) ? value : fallback;
+  };
+  const legacyYear = readRangeNumber("year", now.getFullYear());
+  const legacyMonth = readRangeNumber("month", now.getMonth() + 1);
+  const rawFromYear = readRangeNumber("fromYear", legacyYear);
+  const rawFromMonth = readRangeNumber("fromMonth", legacyMonth);
+  const rawToYear = readRangeNumber("toYear", legacyYear);
+  const rawToMonth = readRangeNumber("toMonth", legacyMonth);
+  const selectedFromYear =
+    rawFromYear >= 2000 && rawFromYear <= 2100 ? rawFromYear : now.getFullYear();
+  const selectedFromMonth =
+    rawFromMonth >= 1 && rawFromMonth <= 12 ? rawFromMonth : now.getMonth() + 1;
+  const selectedToYear =
+    rawToYear >= 2000 && rawToYear <= 2100 ? rawToYear : selectedFromYear;
+  const selectedToMonth =
+    rawToMonth >= 1 && rawToMonth <= 12 ? rawToMonth : selectedFromMonth;
+  const rawRangeStart = new Date(selectedFromYear, selectedFromMonth - 1, 1);
+  const rawRangeEnd = new Date(selectedToYear, selectedToMonth, 1);
+  const selectedRangeStart =
+    rawRangeStart <= rawRangeEnd ? rawRangeStart : new Date(selectedToYear, selectedToMonth - 1, 1);
+  const selectedRangeEnd =
+    rawRangeStart <= rawRangeEnd ? rawRangeEnd : new Date(selectedFromYear, selectedFromMonth, 1);
+  const selectedRangeLabel = `${new Intl.DateTimeFormat(
+    locale === "th" ? "th-TH" : "en-US",
+    { dateStyle: "medium" },
+  ).format(selectedRangeStart)} - ${new Intl.DateTimeFormat(
+    locale === "th" ? "th-TH" : "en-US",
+    { dateStyle: "medium" },
+  ).format(new Date(selectedRangeEnd.getTime() - 1))}`;
+  const yearOptions = Array.from({ length: 8 }, (_, index) => now.getFullYear() - index + 1);
   const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
 
   const [
@@ -523,13 +557,19 @@ export default async function DashboardPage({
     openReports,
     inProgressReports,
     submittedReports,
-    needRevisionReports,
     completedReports,
     recentReports,
     monthlyReports,
     notifications,
   ] = await Promise.all([
-    prisma.service_reports.count(),
+    prisma.service_reports.count({
+      where: {
+        created_at: {
+          gte: selectedRangeStart,
+          lt: selectedRangeEnd,
+        },
+      },
+    }),
     prisma.customers.count(),
     prisma.users.count(),
     prisma.inventory.count({
@@ -539,12 +579,17 @@ export default async function DashboardPage({
         },
       },
     }),
-    prisma.service_reports.count({ where: { status: "Open" } }),
     prisma.service_reports.count({
-      where: { status: { in: ["Assigned", "In_Progress", "On_Site"] } },
+      where: { status: { in: ["Draft", "Open", "Need_Revision"] } },
+    }),
+    prisma.service_reports.count({
+      where: {
+        status: {
+          in: ["Assigned", "In_Progress", "On_Site", "Pending_Customer"],
+        },
+      },
     }),
     prisma.service_reports.count({ where: { status: "Submitted" } }),
-    prisma.service_reports.count({ where: { status: "Need_Revision" } }),
     prisma.service_reports.count({
       where: { status: { in: ["Completed", "Approved", "Closed"] } },
     }),
@@ -598,11 +643,9 @@ export default async function DashboardPage({
     };
   });
   const statusData = [
-    [t.charts.open, openReports, "#2563eb"],
-    [t.charts.inProgress, inProgressReports, "#16a34a"],
+    [t.charts.inProgress, openReports + inProgressReports, "#2563eb"],
     [t.charts.inReview, submittedReports, "#f59e0b"],
-    [t.charts.rework, needRevisionReports, "#ef4444"],
-    [t.charts.closed, completedReports, "#64748b"],
+    [t.charts.closed, completedReports, "#16a34a"],
   ] as const;
   const donePercent = percent(completedReports, totalReports);
 
@@ -619,9 +662,9 @@ export default async function DashboardPage({
   });
 
   return (
-    <main className="animate-page min-h-screen bg-[#f3f6fb] text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <div className="grid lg:grid-cols-[220px_1fr]">
-        <aside className="animate-panel sticky top-0 hidden h-screen self-start overflow-y-auto bg-[#071e49] text-white dark:bg-black lg:block">
+    <main className="animate-page min-h-screen bg-[#f3f6fb] pb-24 text-slate-950 dark:bg-slate-950 dark:text-slate-100 md:pb-0">
+      <div className="grid md:grid-cols-[220px_1fr]">
+        <aside className="animate-panel sticky top-0 hidden h-screen self-start overflow-y-auto bg-[#071e49] text-white dark:bg-black md:block">
           <div className="flex h-16 items-center gap-3 border-b border-white/10 px-5">
             <BrandLogo size={36} priority />
             <span className="text-sm font-bold uppercase tracking-wide">
@@ -650,13 +693,9 @@ export default async function DashboardPage({
         <section className="min-w-0">
           <header className="animate-panel relative z-50 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:px-6">
             <div className="flex items-center gap-3">
-              <button
-                type="button"
-                className="interactive-button inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 text-slate-700 dark:border-slate-700 dark:text-slate-200 lg:hidden"
-                aria-label="Open navigation"
-              >
-                <Menu size={18} />
-              </button>
+              <div className="md:hidden">
+                <BrandLogo size={36} priority />
+              </div>
             </div>
 
             <div className="flex items-center gap-3">
@@ -706,6 +745,96 @@ export default async function DashboardPage({
                   {t.newJob}
                 </Link>
               </div>
+            </section>
+
+            <section className="animate-panel rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+              <form className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+                <input type="hidden" name="lang" value={locale} />
+                <div>
+                  <p className="text-sm font-bold">
+                    {locale === "th" ? "ตัวกรอง Total Job" : "Total Job filter"}
+                  </p>
+                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    {selectedRangeLabel}
+                  </p>
+                </div>
+                <div className="grid gap-3 md:grid-cols-[120px_170px_120px_170px_auto]">
+                  <label className="block">
+                    <span className="text-xs font-bold text-slate-500">
+                      {locale === "th" ? "ปีเริ่ม" : "From year"}
+                    </span>
+                    <select
+                      name="fromYear"
+                      defaultValue={selectedFromYear}
+                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-bold text-slate-500">
+                      {locale === "th" ? "เดือนเริ่ม" : "From month"}
+                    </span>
+                    <select
+                      name="fromMonth"
+                      defaultValue={selectedFromMonth}
+                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                        <option key={month} value={month}>
+                          {new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+                            month: "long",
+                          }).format(new Date(selectedFromYear, month - 1, 1))}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-bold text-slate-500">
+                      {locale === "th" ? "ปีสิ้นสุด" : "To year"}
+                    </span>
+                    <select
+                      name="toYear"
+                      defaultValue={selectedToYear}
+                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      {yearOptions.map((year) => (
+                        <option key={year} value={year}>
+                          {year}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="text-xs font-bold text-slate-500">
+                      {locale === "th" ? "เดือนสิ้นสุด" : "To month"}
+                    </span>
+                    <select
+                      name="toMonth"
+                      defaultValue={selectedToMonth}
+                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
+                        <option key={month} value={month}>
+                          {new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
+                            month: "long",
+                          }).format(new Date(selectedToYear, month - 1, 1))}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <button
+                    type="submit"
+                    className="interactive-button inline-flex h-11 items-center justify-center rounded-lg bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800"
+                  >
+                    {locale === "th" ? "ใช้ตัวกรอง" : "Apply"}
+                  </button>
+                </div>
+              </form>
             </section>
 
             <section className="stagger-list grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -861,6 +990,11 @@ export default async function DashboardPage({
           </div>
         </section>
       </div>
+      <MobileBottomNav
+        locale={locale}
+        active="dashboard"
+        showQr={qrCodeEnabled}
+      />
     </main>
   );
 }

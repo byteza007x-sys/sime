@@ -1,12 +1,12 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, unlink, writeFile } from "fs/promises";
 import path from "path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth";
-import { requireFeature } from "@/lib/features";
+import { isFeatureEnabled, requireFeature } from "@/lib/features";
 import { getLocale, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
 
@@ -116,6 +116,12 @@ const redirectWithError = (
   redirect(`${withLocale(`/reports/${reportId}/work`, locale)}&error=${error}`);
 };
 
+const uploadUrlToPublicPath = (fileUrl: string) => {
+  const normalizedUrl = fileUrl.startsWith("/") ? fileUrl.slice(1) : fileUrl;
+
+  return path.join(process.cwd(), "public", normalizedUrl);
+};
+
 const saveSignatureImage = async (
   dataUrl: string,
   reportId: string,
@@ -157,11 +163,13 @@ const extensionFromFile = (file: File) => {
 const collectPhotoFiles = (formData: FormData) => {
   const rawPhotoTypes = formData.getAll("photoTypes");
   const rawPhotoCaptions = formData.getAll("photoCaptions");
+  const rawPhotoItemLineNos = formData.getAll("photoItemLineNos");
   const rawPhotoFiles = formData.getAll("photoFiles");
   const photos: Array<{
     file: File;
     photoType: ServiceReportPhotoType;
     caption: string | null;
+    itemLineNo: number | null;
   }> = [];
   let error: "photoType" | "photoSize" | null = null;
 
@@ -183,11 +191,13 @@ const collectPhotoFiles = (formData: FormData) => {
       ? (requestedPhotoType as ServiceReportPhotoType)
       : "Other";
     const photoCaption = String(rawPhotoCaptions[index] ?? "").trim();
+    const itemLineNo = Number(rawPhotoItemLineNos[index] ?? "");
 
     photos.push({
       file: value,
       photoType,
       caption: photoCaption || null,
+      itemLineNo: Number.isInteger(itemLineNo) && itemLineNo > 0 ? itemLineNo : null,
     });
   }
 
@@ -276,6 +286,7 @@ const collectServiceItemRows = (formData: FormData) => {
 
 const collectAssetRows = (formData: FormData) => {
   const actionTypes = readTextList(formData, "assetActionTypes");
+  const itemLineNos = readNumberList(formData, "assetItemLineNos");
   const inventoryIds = readNumberList(formData, "assetInventoryIds");
   const models = readTextList(formData, "assetModels");
   const serialNumbers = readTextList(formData, "assetSerialNumbers");
@@ -284,6 +295,7 @@ const collectAssetRows = (formData: FormData) => {
   const installationPoints = readTextList(formData, "assetInstallationPoints");
   const length = Math.max(
     actionTypes.length,
+    itemLineNos.length,
     inventoryIds.length,
     models.length,
     serialNumbers.length,
@@ -294,6 +306,7 @@ const collectAssetRows = (formData: FormData) => {
   const rows: Array<{
     lineNo: number;
     actionType: AssetActionType;
+    itemLineNo: number | null;
     inventoryId: number | null;
     model: string | null;
     serialNumber: string | null;
@@ -314,6 +327,7 @@ const collectAssetRows = (formData: FormData) => {
     rows.push({
       lineNo: rows.length + 1,
       actionType: readAssetActionType(actionTypes[index] ?? "Delivered"),
+      itemLineNo: itemLineNos[index] ?? null,
       inventoryId: noSerial ? null : inventoryIds[index] ?? null,
       model: model || null,
       serialNumber: serialNumber || null,
@@ -336,7 +350,7 @@ const savePhotoFiles = async (
   await mkdir(uploadDir, { recursive: true });
 
   return Promise.all(
-    photos.map(async ({ file, photoType, caption }) => {
+    photos.map(async ({ file, photoType, caption, itemLineNo }) => {
       const fileName = `${reportId}-${photoType.toLowerCase()}-${randomUUID()}${extensionFromFile(
         file,
       )}`;
@@ -348,6 +362,7 @@ const savePhotoFiles = async (
       return {
         photoType,
         caption,
+        itemLineNo,
         fileUrl: `/uploads/photos/${fileName}`,
         originalName: file.name || fileName,
         mimeType: file.type || "image/jpeg",
@@ -361,6 +376,7 @@ export async function submitServiceWorkAction(formData: FormData) {
   const locale = getLocale(String(formData.get("lang") ?? "en"));
   const user = await requireUser(locale);
   await requireFeature({ key: "service_reports", user, locale });
+  const gpsDistanceLimitEnabled = await isFeatureEnabled("gps_distance_limit");
   const reportId = readText(formData, "reportId");
   const serviceItemRows = collectServiceItemRows(formData);
   const selectedServiceTypes =
@@ -374,13 +390,16 @@ export async function submitServiceWorkAction(formData: FormData) {
   const recommendation = readText(formData, "recommendation");
   const chargeType = readChargeType(formData);
   const serviceFee = readNumber(formData, "serviceFee");
-  const otherChargeNote = readText(formData, "otherChargeNote");
+  const typedChargeNote = readText(formData, "otherChargeNote");
+  const otherChargeNote =
+    chargeType === "Free_Service" && !typedChargeNote
+      ? "ไม่มีค่าบริการ"
+      : typedChargeNote;
   const responsivenessScore = readScore(formData, "responsivenessScore");
   const staffKnowledgeScore = readScore(formData, "staffKnowledgeScore");
   const serviceQualityScore = readScore(formData, "serviceQualityScore");
   const problemSolutionScore = readScore(formData, "problemSolutionScore");
   const overallScore = readScore(formData, "overallScore");
-  const npsScore = readNumber(formData, "npsScore");
   const customerComment = readText(formData, "customerComment");
   const customerName = readText(formData, "customerName");
   const customerPosition = readText(formData, "customerPosition");
@@ -454,7 +473,16 @@ export async function submitServiceWorkAction(formData: FormData) {
     },
     include: {
       customers: true,
-      engineers: true,
+      engineers: {
+        include: {
+          users: {
+            select: {
+              full_name: true,
+              email: true,
+            },
+          },
+        },
+      },
       customer_contacts: true,
       customer_sites: true,
       service_report_assignments: {
@@ -486,6 +514,39 @@ export async function submitServiceWorkAction(formData: FormData) {
   }
   if (!isAdminLike && report.status && LOCKED_FOR_USER_STATUSES.has(report.status)) {
     redirect(withLocale(`/reports/${reportId}/service-form`, locale));
+  }
+
+  if (engineerSignature.startsWith("/uploads/signatures/")) {
+    if (engineerSignature !== report.engineer_signature_url) {
+      const [profileSignature, historicalSignature] = await Promise.all([
+        prisma.uploaded_files.findFirst({
+          where: {
+            uploaded_by: report.engineers.user_id,
+            file_category: "Signature",
+            file_url: engineerSignature,
+          },
+          select: {
+            file_id: true,
+          },
+        }),
+        prisma.service_report_signatures.findFirst({
+          where: {
+            signer_type: "Engineer",
+            signature_url: engineerSignature,
+            service_reports: {
+              engineer_id: report.engineer_id,
+            },
+          },
+          select: {
+            signature_id: true,
+          },
+        }),
+      ]);
+
+      if (!profileSignature && !historicalSignature) {
+        redirectWithError(reportId, locale, "default");
+      }
+    }
   }
 
   const resolvedCustomerId = customerId ?? report.customer_id;
@@ -529,16 +590,24 @@ export async function submitServiceWorkAction(formData: FormData) {
       ? calculateDistanceKm(gpsLat, gpsLong, siteLat, siteLong)
       : null;
 
-  if (siteDistanceKm !== null && siteDistanceKm > MAX_SITE_DISTANCE_KM) {
+  if (
+    gpsDistanceLimitEnabled &&
+    siteDistanceKm !== null &&
+    siteDistanceKm > MAX_SITE_DISTANCE_KM
+  ) {
     redirectWithError(reportId, locale, "gpsRange");
   }
 
   const customerSignatureUrl = customerSignature
     ? await saveSignatureImage(customerSignature, reportId, "customer")
     : null;
-  const engineerSignatureUrl = engineerSignature
-    ? await saveSignatureImage(engineerSignature, reportId, "engineer")
-    : null;
+  const savedEngineerSignatureUrl =
+    engineerSignature && engineerSignature.startsWith("data:image/")
+      ? await saveSignatureImage(engineerSignature, reportId, "engineer")
+      : null;
+  const engineerSignatureUrl =
+    savedEngineerSignatureUrl ??
+    (engineerSignature.startsWith("/uploads/signatures/") ? engineerSignature : null);
 
   const validCustomerSignatureUrl =
     isDraft
@@ -549,7 +618,21 @@ export async function submitServiceWorkAction(formData: FormData) {
   const now = new Date();
   const savedPhotos = await savePhotoFiles(uploadedPhotos, reportId);
 
-  await prisma.$transaction(async (tx) => {
+  try {
+    await prisma.$transaction(async (tx) => {
+    const currentReport = await tx.service_reports.findUnique({
+      where: {
+        report_id: reportId,
+      },
+      select: {
+        status: true,
+      },
+    });
+
+    if (!currentReport || currentReport.status !== report.status) {
+      throw new Error("RACE_CONDITION_DETECTED");
+    }
+
     const typedContact =
       report.customer_contacts &&
       report.customer_contacts.customer_id === validCustomer.customer_id &&
@@ -687,6 +770,7 @@ export async function submitServiceWorkAction(formData: FormData) {
         data: {
           report_id: reportId,
           line_no: asset.lineNo,
+          item_line_no: asset.itemLineNo,
           action_type: asset.actionType,
           brand: null,
           model: asset.model,
@@ -778,6 +862,7 @@ export async function submitServiceWorkAction(formData: FormData) {
           report_id: reportId,
           file_id: uploadedFile.file_id,
           photo_type: photo.photoType,
+          item_line_no: photo.itemLineNo,
           file_url: photo.fileUrl,
           caption: photo.caption,
           gps_lat: gpsLat,
@@ -877,10 +962,7 @@ export async function submitServiceWorkAction(formData: FormData) {
         problem_solution_score: problemSolutionScore,
         overall_score: overallScore,
         csat_average: csatAverage,
-        nps_score:
-          npsScore !== null && Number.isInteger(npsScore) && npsScore >= 0 && npsScore <= 10
-            ? npsScore
-            : null,
+        nps_score: null,
         customer_comment: customerComment || null,
       },
       create: {
@@ -891,10 +973,7 @@ export async function submitServiceWorkAction(formData: FormData) {
         problem_solution_score: problemSolutionScore,
         overall_score: overallScore,
         csat_average: csatAverage,
-        nps_score:
-          npsScore !== null && Number.isInteger(npsScore) && npsScore >= 0 && npsScore <= 10
-            ? npsScore
-            : null,
+        nps_score: null,
         customer_comment: customerComment || null,
       },
     });
@@ -958,7 +1037,28 @@ export async function submitServiceWorkAction(formData: FormData) {
         });
       }
     }
-  });
+    });
+  } catch (error) {
+    const uploadedFileUrls = [
+      ...savedPhotos.map((photo) => photo.fileUrl),
+      customerSignatureUrl,
+      savedEngineerSignatureUrl,
+    ].filter((fileUrl): fileUrl is string => Boolean(fileUrl));
+
+    await Promise.all(
+      uploadedFileUrls.map((fileUrl) =>
+        unlink(uploadUrlToPublicPath(fileUrl)).catch(() => {}),
+      ),
+    );
+
+    redirectWithError(
+      reportId,
+      locale,
+      error instanceof Error && error.message === "RACE_CONDITION_DETECTED"
+        ? "raceCondition"
+        : "transactionFailed",
+    );
+  }
 
   revalidatePath("/dashboard");
   revalidatePath("/reports");

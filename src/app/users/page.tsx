@@ -1,33 +1,14 @@
 import Link from "next/link";
-import {
-  ArrowLeft,
-  BadgeCheck,
-  Mail,
-  MessageSquare,
-  Phone,
-  Send,
-  Shield,
-  UserPlus,
-  UserRound,
-  Users,
-} from "lucide-react";
-import DeleteUserButton from "@/components/delete-user-button";
+import { ArrowLeft, UserPlus, Users } from "lucide-react";
 import LanguageSwitcher from "@/components/language-switcher";
 import ThemeToggle from "@/components/theme-toggle";
-import BackupButton from "@/components/backup-button";
-import { triggerBackupAction } from "@/app/backup/actions";
+import UserDirectory, { type DirectoryUser } from "@/components/user-directory";
 import { requireUser } from "@/lib/auth";
 import { requireFeature } from "@/lib/features";
 import { getLocale, type Locale, type RouteSearchParams, withLocale } from "@/lib/i18n";
 import { isOwnerUser, OWNER_USERNAME } from "@/lib/owner";
 import { prisma } from "@/lib/prisma";
-import {
-  createUserAction,
-  deleteUserAction,
-  ensureSupportedRoles,
-  sendUserMessageAction,
-  toggleUserStatusAction,
-} from "./actions";
+import { createUserAction, ensureSupportedRoles } from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -39,7 +20,8 @@ const copy = {
   en: {
     backDashboard: "Dashboard",
     title: "User Management",
-    subtitle: "Create accounts, choose admin/user access, and manage sign-in.",
+    subtitle:
+      "Create accounts, review employee profiles, inspect work history, and audit user activity.",
     adminRequired: "Admin access required",
     adminRequiredDetail:
       "Your account can view the system, but only admin users can manage user accounts.",
@@ -61,32 +43,98 @@ const copy = {
     createButton: "Create user",
     users: "Users",
     accounts: (count: number) => `${count} accounts in the system`,
-    table: {
-      user: "User",
-      role: "Role",
-      phone: "Phone",
-      status: "Status",
-      action: "Action",
-    },
     status: {
       active: "Active",
       disabled: "Disabled",
     },
-    currentUser: "Current user",
-    disable: "Disable",
-    enable: "Enable",
-    delete: "Delete",
-    confirmDelete: "Delete this user?",
     roles: {
       admin: "Admin",
       support: "Support",
       user: "User",
     },
+    feedback: {
+      created: "User account was created successfully.",
+      updated: "User status was updated successfully.",
+      profile_updated: "User information and profile photo were updated successfully.",
+      username: "Username must be at least 3 characters.",
+      email: "Email format is invalid.",
+      password: "Password must be at least 8 characters.",
+      role: "Please choose a supported role.",
+      duplicate: "Username or email already exists.",
+      duplicate_username: "This username is already used by another account.",
+      duplicate_email: "This email is already used by another account.",
+      employee: "Employee ID already exists.",
+      avatar_type: "Profile photo must be a JPEG, PNG, WebP, or GIF image.",
+      avatar_size: "Profile photo must not exceed 3 MB.",
+      signature_type: "Staff signature must be a JPEG, PNG, WebP, or GIF image.",
+      signature_size: "Staff signature must not exceed 3 MB.",
+      profile_failed: "Could not update this user profile. Please try again.",
+      reserved_user: "This username is reserved.",
+      create_failed: "Could not create this user. Please check the form and try again.",
+      delete_self: "You cannot delete the account currently in use.",
+      disable_self: "You cannot disable the account currently in use.",
+      user_missing: "User account was not found.",
+      delete_has_history: "This user has work history and cannot be deleted.",
+    },
+    directory: {
+      grid: "Grid",
+      table: "Table",
+      details: "View details",
+      allReports: "View all service jobs",
+      profile: "User profile",
+      workStats: "Work and activity summary",
+      recentJobs: "Recent service jobs",
+      activityLog: "Recent activity log",
+      editProfile: "Edit information and photo",
+      saveProfile: "Save profile",
+      fullName: "Full name",
+      profilePhoto: "Profile photo",
+      photoHint: "JPEG, PNG, WebP, or GIF up to 3 MB",
+      staffSignature: "Saved staff signature",
+      signatureHint: "Upload once. It will be selected automatically for every assigned job.",
+      signatureReady: "A saved signature is ready to use.",
+      cancel: "Cancel",
+      role: "Role",
+      phone: "Phone",
+      email: "Email",
+      employeeId: "Employee ID",
+      department: "Department",
+      position: "Position",
+      status: "Status",
+      created: "Created",
+      lastLogin: "Last login",
+      currentUser: "Current user",
+      disable: "Disable",
+      enable: "Enable",
+      delete: "Delete",
+      confirmDelete: "Delete this user?",
+      messageUser: "Message user",
+      messagePlaceholder: "Type a message...",
+      send: "Send",
+      noData: "No data",
+      stats: {
+        created: "Created",
+        assigned: "Assigned",
+        active: "Active",
+        submitted: "Submitted",
+        approved: "Approved",
+        closed: "Closed",
+      },
+      tableHeaders: {
+        user: "User",
+        role: "Role",
+        phone: "Phone",
+        status: "Status",
+        stats: "Work",
+        action: "Action",
+      },
+    },
   },
   th: {
     backDashboard: "แดชบอร์ด",
     title: "จัดการผู้ใช้",
-    subtitle: "สร้างบัญชี เลือกสิทธิ์ admin/user และจัดการการเข้าใช้งาน",
+    subtitle:
+      "สร้างบัญชี ดูโปรไฟล์พนักงาน ตรวจประวัติใบเซอร์วิซ และดู log การใช้งานของแต่ละคน",
     adminRequired: "ต้องใช้สิทธิ์แอดมิน",
     adminRequiredDetail:
       "บัญชีของคุณดูระบบได้ แต่เฉพาะแอดมินเท่านั้นที่จัดการบัญชีผู้ใช้ได้",
@@ -108,132 +156,124 @@ const copy = {
     createButton: "สร้างผู้ใช้",
     users: "ผู้ใช้",
     accounts: (count: number) => `มีบัญชีทั้งหมด ${count} บัญชีในระบบ`,
-    table: {
-      user: "ผู้ใช้",
-      role: "สิทธิ์",
-      phone: "เบอร์โทร",
-      status: "สถานะ",
-      action: "จัดการ",
-    },
     status: {
       active: "ใช้งาน",
       disabled: "ปิดใช้งาน",
     },
-    currentUser: "บัญชีที่ใช้อยู่",
-    disable: "ปิดใช้งาน",
-    enable: "เปิดใช้งาน",
-    delete: "ลบ",
-    confirmDelete: "ยืนยันที่จะลบผู้ใช้นี้ไหม?",
     roles: {
       admin: "แอดมิน",
       support: "Support",
       user: "ผู้ใช้",
     },
+    feedback: {
+      created: "สร้างผู้ใช้สำเร็จแล้ว",
+      updated: "อัปเดตสถานะผู้ใช้สำเร็จแล้ว",
+      profile_updated: "อัปเดตข้อมูลและรูปผู้ใช้สำเร็จแล้ว",
+      username: "Username ต้องมีอย่างน้อย 3 ตัวอักษร",
+      email: "รูปแบบ Email ไม่ถูกต้อง",
+      password: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
+      role: "กรุณาเลือกสิทธิ์ที่ระบบรองรับ",
+      duplicate: "Username หรือ Email นี้มีอยู่แล้ว",
+      duplicate_username: "Username นี้มีคนใช้ไปแล้ว กรุณาใช้ชื่ออื่น",
+      duplicate_email: "Email นี้มีคนใช้ไปแล้ว กรุณาใช้ Email อื่น",
+      employee: "รหัสพนักงานนี้มีอยู่แล้ว",
+      avatar_type: "รูปผู้ใช้ต้องเป็นไฟล์ JPEG, PNG, WebP หรือ GIF",
+      avatar_size: "รูปผู้ใช้ต้องมีขนาดไม่เกิน 3 MB",
+      signature_type: "ลายเซ็นต้องเป็นไฟล์ JPEG, PNG, WebP หรือ GIF",
+      signature_size: "ไฟล์ลายเซ็นต้องมีขนาดไม่เกิน 3 MB",
+      profile_failed: "อัปเดตข้อมูลผู้ใช้ไม่สำเร็จ กรุณาลองใหม่",
+      reserved_user: "Username นี้ถูกสงวนไว้",
+      create_failed: "สร้างผู้ใช้ไม่สำเร็จ กรุณาตรวจข้อมูลแล้วลองใหม่",
+      delete_self: "ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่ได้",
+      disable_self: "ไม่สามารถปิดบัญชีที่กำลังใช้งานอยู่ได้",
+      user_missing: "ไม่พบบัญชีผู้ใช้นี้",
+      delete_has_history: "ผู้ใช้นี้มีประวัติการทำงานแล้ว จึงไม่สามารถลบได้",
+    },
+    directory: {
+      grid: "Grid",
+      table: "Table",
+      details: "ดูข้อมูลเพิ่มเติม",
+      allReports: "ดูใบเซอร์วิซทั้งหมด",
+      profile: "ข้อมูลผู้ใช้",
+      workStats: "สรุปผลงานและกิจกรรม",
+      recentJobs: "ใบเซอร์วิซล่าสุด",
+      activityLog: "Log การใช้งานล่าสุด",
+      editProfile: "แก้ไขข้อมูลและรูป",
+      saveProfile: "บันทึกข้อมูล",
+      fullName: "ชื่อ-นามสกุล",
+      profilePhoto: "รูปผู้ใช้",
+      photoHint: "รองรับ JPEG, PNG, WebP หรือ GIF ขนาดไม่เกิน 3 MB",
+      staffSignature: "ลายเซ็นประจำตัว",
+      signatureHint: "อัปโหลดครั้งเดียว ระบบจะเลือกให้อัตโนมัติในทุกใบงานที่ได้รับมอบหมาย",
+      signatureReady: "มีลายเซ็นพร้อมใช้งานแล้ว",
+      cancel: "ยกเลิก",
+      role: "สิทธิ์",
+      phone: "เบอร์โทร",
+      email: "Email",
+      employeeId: "รหัสพนักงาน",
+      department: "แผนก",
+      position: "ตำแหน่ง",
+      status: "สถานะ",
+      created: "สร้างเมื่อ",
+      lastLogin: "เข้าใช้ล่าสุด",
+      currentUser: "บัญชีที่ใช้อยู่",
+      disable: "ปิดใช้งาน",
+      enable: "เปิดใช้งาน",
+      delete: "ลบ",
+      confirmDelete: "ยืนยันที่จะลบผู้ใช้นี้ไหม?",
+      messageUser: "ส่งข้อความถึงผู้ใช้",
+      messagePlaceholder: "พิมพ์ข้อความ...",
+      send: "ส่งข้อความ",
+      noData: "ไม่มีข้อมูล",
+      stats: {
+        created: "เปิดเอง",
+        assigned: "รับผิดชอบ",
+        active: "กำลังทำ",
+        submitted: "Submitted",
+        approved: "Approved",
+        closed: "ปิดแล้ว",
+      },
+      tableHeaders: {
+        user: "ผู้ใช้",
+        role: "สิทธิ์",
+        phone: "เบอร์โทร",
+        status: "สถานะ",
+        stats: "งาน",
+        action: "จัดการ",
+      },
+    },
   },
 } satisfies Record<Locale, object>;
 
-const thaiCopy = {
-  ...copy.en,
-  backDashboard: "แดชบอร์ด",
-  title: "จัดการผู้ใช้",
-  subtitle: "สร้างบัญชี เลือกสิทธิ์ admin/user ส่งข้อความ และจัดการการเข้าใช้งาน",
-  adminRequired: "ต้องใช้สิทธิ์แอดมิน",
-  adminRequiredDetail:
-    "บัญชีของคุณดูระบบได้ แต่เฉพาะแอดมินเท่านั้นที่จัดการบัญชีผู้ใช้ได้",
-  createUser: "สร้างผู้ใช้",
-  username: "Username",
-  fullName: "ชื่อ-นามสกุล",
-  email: "Email (ไม่บังคับ)",
-  password: "รหัสผ่าน",
-  role: "สิทธิ์",
-  phone: "เบอร์โทร",
-  userDetails: "ข้อมูลการทำงาน",
-  employeeIdPlaceholder: "รหัสพนักงาน เช่น USER-002",
-  departmentPlaceholder: "แผนก",
-  positionPlaceholder: "ตำแหน่ง",
-  passwordPlaceholder: "อย่างน้อย 8 ตัวอักษร",
-  fullNamePlaceholder: "ผู้ใช้ระบบบริการ",
-  usernamePlaceholder: "service-user",
-  phonePlaceholder: "099-000-0000",
-  createButton: "สร้างผู้ใช้",
-  users: "ผู้ใช้",
-  accounts: (count: number) => `มีบัญชีทั้งหมด ${count} บัญชีในระบบ`,
-  table: {
-    user: "ผู้ใช้",
-    role: "สิทธิ์",
-    phone: "เบอร์โทร",
-    status: "สถานะ",
-    action: "จัดการ",
-  },
-  status: {
-    active: "ใช้งาน",
-    disabled: "ปิดใช้งาน",
-  },
-  currentUser: "บัญชีที่ใช้อยู่",
-  disable: "ปิดใช้งาน",
-  enable: "เปิดใช้งาน",
-  delete: "ลบ",
-  confirmDelete: "ยืนยันที่จะลบผู้ใช้นี้ไหม?",
-  roles: {
-    admin: "แอดมิน",
-    support: "Support",
-    user: "ผู้ใช้",
-  },
-} satisfies typeof copy.en;
+type FeedbackKey = keyof (typeof copy)["en"]["feedback"];
 
-const messageCopy = {
-  en: {
-    label: "Message user",
-    placeholder: "Type a message...",
-    send: "Send",
-  },
-  th: {
-    label: "ส่งข้อความถึงผู้ใช้",
-    placeholder: "พิมพ์ข้อความ...",
-    send: "ส่งข้อความ",
-  },
-} satisfies Record<Locale, Record<string, string>>;
+const activeStatuses = new Set([
+  "Draft",
+  "Open",
+  "Assigned",
+  "In_Progress",
+  "On_Site",
+  "Pending_Customer",
+  "Need_Revision",
+]);
+const approvedStatuses = new Set(["Approved", "Completed", "Closed"]);
+const closedStatuses = new Set(["Approved", "Completed", "Closed", "Cancelled"]);
 
-const feedbackCopy = {
-  en: {
-    created: "User account was created successfully.",
-    updated: "User status was updated successfully.",
-    username: "Username must be at least 3 characters.",
-    email: "Email format is invalid.",
-    password: "Password must be at least 8 characters.",
-    role: "Please choose a supported role.",
-    duplicate: "Username or email already exists.",
-    duplicate_username: "This username is already used by another account.",
-    duplicate_email: "This email is already used by another account.",
-    employee: "Employee ID already exists.",
-    reserved_user: "This username is reserved.",
-    create_failed: "Could not create this user. Please check the form and try again.",
-    delete_self: "You cannot delete the account currently in use.",
-    disable_self: "You cannot disable the account currently in use.",
-    user_missing: "User account was not found.",
-    delete_has_history: "This user has work history and cannot be deleted.",
-  },
-  th: {
-    created: "สร้างผู้ใช้สำเร็จแล้ว",
-    updated: "อัปเดตสถานะผู้ใช้สำเร็จแล้ว",
-    username: "Username ต้องมีอย่างน้อย 3 ตัวอักษร",
-    email: "รูปแบบ Email ไม่ถูกต้อง",
-    password: "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
-    role: "กรุณาเลือกสิทธิ์ที่ระบบรองรับ",
-    duplicate: "Username หรือ Email นี้มีอยู่แล้ว",
-    duplicate_username: "Username นี้มีคนใช้ไปแล้ว กรุณาใช้ชื่ออื่น",
-    duplicate_email: "Email นี้มีคนใช้ไปแล้ว กรุณาใช้ Email อื่น",
-    employee: "รหัสพนักงานนี้มีอยู่แล้ว",
-    reserved_user: "Username นี้ถูกสงวนไว้",
-    create_failed: "สร้างผู้ใช้ไม่สำเร็จ กรุณาตรวจข้อมูลแล้วลองใหม่",
-    delete_self: "ไม่สามารถลบบัญชีที่กำลังใช้งานอยู่ได้",
-    disable_self: "ไม่สามารถปิดบัญชีที่กำลังใช้งานอยู่ได้",
-    user_missing: "ไม่พบบัญชีผู้ใช้นี้",
-    delete_has_history: "ผู้ใช้นี้มีประวัติการทำงานแล้ว จึงไม่สามารถลบได้",
-  },
-} satisfies Record<Locale, Record<string, string>>;
+const toIso = (date: Date | null | undefined) => (date ? date.toISOString() : null);
 
-type FeedbackKey = keyof (typeof feedbackCopy)["en"];
+const summarizeJson = (value: string | null | undefined) => {
+  if (!value) return "";
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return Object.entries(parsed)
+      .slice(0, 3)
+      .map(([key, item]) => `${key}: ${String(item)}`)
+      .join(" / ");
+  } catch {
+    return value.slice(0, 120);
+  }
+};
 
 export default async function UsersPage({ searchParams }: UsersPageProps) {
   const params = await searchParams;
@@ -241,10 +281,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const currentUser = await requireUser(locale);
   await requireFeature({ key: "users", user: currentUser, locale });
   const isAdmin = currentUser.roles.role_name === "admin" || isOwnerUser(currentUser);
-  const t = locale === "th" ? thaiCopy : copy.en;
-  const messageText = messageCopy[locale];
-  const feedbackText = feedbackCopy[locale];
-  const backupStatus = Array.isArray(params.backup) ? params.backup[0] : params.backup;
+  const t = copy[locale];
   const errorKey = String(
     Array.isArray(params.error) ? params.error[0] : params.error ?? "",
   );
@@ -254,20 +291,20 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
   const updated = Boolean(
     Array.isArray(params.updated) ? params.updated[0] : params.updated,
   );
+  const profileUpdated = Boolean(
+    Array.isArray(params.profile_updated)
+      ? params.profile_updated[0]
+      : params.profile_updated,
+  );
   const feedbackMessage = created
-    ? feedbackText.created
-    : updated
-      ? feedbackText.updated
-    : errorKey
-      ? feedbackText[errorKey as FeedbackKey] ?? feedbackText.create_failed
-      : null;
-  const formatDateTime = (date: Date | null) =>
-    date
-      ? new Intl.DateTimeFormat(locale === "th" ? "th-TH" : "en-US", {
-          dateStyle: "medium",
-          timeStyle: "short",
-        }).format(date)
-      : "-";
+    ? t.feedback.created
+    : profileUpdated
+      ? t.feedback.profile_updated
+      : updated
+        ? t.feedback.updated
+      : errorKey
+        ? t.feedback[errorKey as FeedbackKey] ?? t.feedback.create_failed
+        : null;
 
   if (isAdmin) {
     await ensureSupportedRoles();
@@ -288,6 +325,20 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       include: {
         roles: true,
         engineers: true,
+        uploaded_files: {
+          where: {
+            file_category: "Signature",
+          },
+          orderBy: [
+            {
+              created_at: "desc",
+            },
+            {
+              file_id: "desc",
+            },
+          ],
+          take: 1,
+        },
       },
       orderBy: {
         created_at: "desc",
@@ -304,6 +355,165 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
       },
     }),
   ]);
+
+  const directoryUsers: DirectoryUser[] = isAdmin
+    ? await Promise.all(
+        users.map(async (user) => {
+          const engineerIds = user.engineers.map((engineer) => engineer.engineer_id);
+          const workWhere = {
+            OR: [
+              {
+                created_by: user.user_id,
+              },
+              {
+                engineer_id: {
+                  in: engineerIds.length > 0 ? engineerIds : [-1],
+                },
+              },
+              {
+                service_report_assignments: {
+                  some: {
+                    engineer_id: {
+                      in: engineerIds.length > 0 ? engineerIds : [-1],
+                    },
+                  },
+                },
+              },
+            ],
+          };
+          const [reports, logs] = await Promise.all([
+            prisma.service_reports.findMany({
+              where: workWhere,
+              select: {
+                report_id: true,
+                job_number: true,
+                status: true,
+                priority: true,
+                service_type: true,
+                created_by: true,
+                engineer_id: true,
+                created_at: true,
+                updated_at: true,
+                customers: {
+                  select: {
+                    company_name: true,
+                  },
+                },
+                customer_sites: {
+                  select: {
+                    site_name: true,
+                  },
+                },
+              },
+              orderBy: [
+                {
+                  updated_at: "desc",
+                },
+                {
+                  created_at: "desc",
+                },
+              ],
+            }),
+            prisma.audit_logs.findMany({
+              where: {
+                user_id: user.user_id,
+              },
+              select: {
+                log_id: true,
+                action: true,
+                table_name: true,
+                record_id: true,
+                old_data: true,
+                new_data: true,
+                created_at: true,
+              },
+              orderBy: {
+                created_at: "desc",
+              },
+              take: 12,
+            }),
+          ]);
+          const primaryEngineer = user.engineers[0] ?? null;
+          const createdJobs = reports.filter(
+            (report) => report.created_by === user.user_id,
+          ).length;
+          const assignedJobs = reports.filter(
+            (report) =>
+              report.engineer_id !== null && engineerIds.includes(report.engineer_id),
+          ).length;
+
+          return {
+            userId: user.user_id,
+            username: user.username || "",
+            email: user.email,
+            fullName: user.full_name || "",
+            phone: user.phone || "",
+            roleName: user.roles.role_name,
+            roleLabel: roleLabel(user.roles.role_name),
+            isActive: Boolean(user.is_active),
+            createdAt: toIso(user.created_at),
+            lastLoginAt: toIso(user.last_login_at),
+            engineer: {
+              employeeId: primaryEngineer?.employee_id || "",
+              name:
+                [primaryEngineer?.first_name, primaryEngineer?.last_name]
+                  .filter(Boolean)
+                  .join(" ") ||
+                user.full_name ||
+                user.username ||
+                "",
+              phone: primaryEngineer?.phone || "",
+              department: primaryEngineer?.department || "",
+              position: primaryEngineer?.position || "",
+              status: primaryEngineer?.status || "",
+              avatarUrl: primaryEngineer?.avatar_url || "",
+              signatureUrl: user.uploaded_files[0]?.file_url || "",
+            },
+            stats: {
+              createdJobs,
+              assignedJobs,
+              activeJobs: reports.filter((report) =>
+                activeStatuses.has(String(report.status)),
+              ).length,
+              submittedJobs: reports.filter((report) => report.status === "Submitted")
+                .length,
+              approvedJobs: reports.filter((report) =>
+                approvedStatuses.has(String(report.status)),
+              ).length,
+              closedJobs: reports.filter((report) =>
+                closedStatuses.has(String(report.status)),
+              ).length,
+            },
+            recentReports: reports.map((report) => ({
+              reportId: report.report_id,
+              jobNumber: report.job_number,
+              status: String(report.status || "-"),
+              priority: String(report.priority || "Normal"),
+              serviceType: String(report.service_type || "-"),
+              customer: report.customers.company_name,
+              site: report.customer_sites?.site_name || "",
+              updatedAt: toIso(report.updated_at),
+            })),
+            recentLogs: logs.map((log) => ({
+              id: log.log_id,
+              action: log.action || "",
+              table: log.table_name || "",
+              recordId: log.record_id || "",
+              createdAt: toIso(log.created_at),
+              summary: summarizeJson(log.new_data || log.old_data),
+            })),
+          };
+        }),
+      )
+    : [];
+
+  const directoryText = {
+    users: t.users,
+    accounts: t.accounts(users.length),
+    active: t.status.active,
+    disabled: t.status.disabled,
+    ...t.directory,
+  };
 
   return (
     <main className="animate-page min-h-screen bg-slate-100 px-4 py-6 text-slate-950 dark:bg-slate-950 dark:text-white sm:px-6">
@@ -333,39 +543,13 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
           <div className="flex items-center gap-3">
             <LanguageSwitcher locale={locale} pathname="/users" />
             <ThemeToggle />
-            {isAdmin ? (
-              <BackupButton
-                action={triggerBackupAction}
-                locale={locale}
-                returnTo="/users"
-                source="users"
-              />
-            ) : null}
           </div>
         </header>
-
-        {backupStatus === "success" || backupStatus === "failed" ? (
-          <section
-            className={`animate-panel rounded-2xl border px-5 py-4 text-sm font-semibold shadow-sm ${
-              backupStatus === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
-            }`}
-          >
-            {backupStatus === "success"
-              ? locale === "th"
-                ? "สำรองข้อมูลเรียบร้อยแล้ว"
-                : "Backup completed."
-              : locale === "th"
-                ? "สำรองข้อมูลไม่สำเร็จ กรุณาตรวจสอบหน้า System"
-                : "Backup failed. Please check the System page."}
-          </section>
-        ) : null}
 
         {feedbackMessage ? (
           <div
             className={`animate-panel rounded-2xl border px-5 py-4 text-sm font-semibold shadow-sm ${
-              created || updated
+              created || updated || profileUpdated
                 ? "border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
                 : "border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200"
             }`}
@@ -489,309 +673,12 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
               </form>
             </div>
 
-            <div className="animate-panel interactive-card overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="border-b border-slate-200 px-5 py-4 dark:border-slate-800">
-                <h2 className="font-bold">{t.users}</h2>
-                <p className="text-sm text-slate-500 dark:text-slate-400">
-                  {t.accounts(users.length)}
-                </p>
-              </div>
-
-              <div className="grid gap-3 p-4 lg:hidden">
-                {users.map((user) => (
-                  <article
-                    key={user.user_id}
-                    className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <h3 className="truncate font-bold">
-                          {user.full_name || user.username || user.email}
-                        </h3>
-                        <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                          <UserRound size={13} />
-                          {user.username || "-"}
-                        </p>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                          <Mail size={13} />
-                          {user.email}
-                        </p>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-bold ${
-                          user.is_active
-                            ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
-                            : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                        }`}
-                      >
-                        {user.is_active ? t.status.active : t.status.disabled}
-                      </span>
-                    </div>
-
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-200">
-                        <Shield size={13} />
-                        {roleLabel(user.roles.role_name)}
-                      </span>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-white px-2.5 py-1 text-xs font-bold text-slate-600 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-300 dark:ring-slate-700">
-                        <Phone size={13} />
-                        {user.phone || "-"}
-                      </span>
-                    </div>
-                    <div className="mt-3 rounded-lg bg-white p-3 text-xs text-slate-500 ring-1 ring-slate-200 dark:bg-slate-900 dark:text-slate-400 dark:ring-slate-700">
-                      <p>
-                        {locale === "th" ? "สร้างเมื่อ" : "Created"}:{" "}
-                        {formatDateTime(user.created_at)}
-                      </p>
-                      <p className="mt-1">
-                        {locale === "th" ? "เข้าใช้ล่าสุด" : "Last login"}:{" "}
-                        {formatDateTime(user.last_login_at)}
-                      </p>
-                      <p className="mt-1">
-                        {locale === "th" ? "แผนก/ตำแหน่ง" : "Department/position"}:{" "}
-                        {[user.engineers[0]?.department, user.engineers[0]?.position]
-                          .filter(Boolean)
-                          .join(" / ") || "-"}
-                      </p>
-                    </div>
-
-                    {user.user_id === currentUser.user_id ? (
-                      <p className="mt-4 text-xs font-semibold text-slate-400">
-                        {t.currentUser}
-                      </p>
-                    ) : (
-                      <div className="mt-4 grid gap-2">
-                        <div className="grid grid-cols-2 gap-2">
-                          <form action={toggleUserStatusAction}>
-                            <input type="hidden" name="lang" value={locale} />
-                            <input type="hidden" name="userId" value={user.user_id} />
-                            <button
-                              type="submit"
-                              className="interactive-button h-10 w-full rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-white dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                            >
-                              {user.is_active ? t.disable : t.enable}
-                            </button>
-                          </form>
-                          <DeleteUserButton
-                            action={deleteUserAction}
-                            userId={user.user_id}
-                            locale={locale}
-                            label={t.delete}
-                            confirmMessage={t.confirmDelete}
-                          />
-                        </div>
-
-                        {user.is_active ? (
-                          <form
-                            action={sendUserMessageAction}
-                            className="rounded-xl border border-slate-200 bg-white p-2 dark:border-slate-700 dark:bg-slate-900"
-                          >
-                            <input type="hidden" name="lang" value={locale} />
-                            <input type="hidden" name="userId" value={user.user_id} />
-                            <label className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
-                              <MessageSquare size={13} />
-                              {messageText.label}
-                            </label>
-                            <textarea
-                              name="message"
-                              required
-                              rows={2}
-                              maxLength={500}
-                              placeholder={messageText.placeholder}
-                              className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                            />
-                            <button
-                              type="submit"
-                              className="interactive-button mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
-                            >
-                              <Send size={13} />
-                              {messageText.send}
-                            </button>
-                          </form>
-                        ) : null}
-                      </div>
-                    )}
-                  </article>
-                ))}
-              </div>
-
-              <div className="hidden overflow-x-auto lg:block">
-                <table className="w-full min-w-[760px]">
-                  <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500 dark:bg-slate-950 dark:text-slate-400">
-                    <tr>
-                      <th className="px-5 py-3">{t.table.user}</th>
-                      <th className="px-5 py-3">{t.table.role}</th>
-                      <th className="px-5 py-3">{t.table.phone}</th>
-                      <th className="px-5 py-3">{t.table.status}</th>
-                      <th className="px-5 py-3">{t.table.action}</th>
-                    </tr>
-                  </thead>
-                  <tbody className="stagger-list divide-y divide-slate-100 dark:divide-slate-800">
-                    {users.map((user) => (
-                      <tr key={user.user_id} className="table-row-motion text-sm">
-                        <td className="px-5 py-4">
-                          <p className="font-bold">
-                            {user.full_name || user.username || user.email}
-                          </p>
-                          <p className="mt-1 flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-slate-300">
-                            <UserRound size={13} />
-                            {user.username || "-"}
-                          </p>
-                          <p className="mt-1 flex items-center gap-1 text-xs text-slate-500 dark:text-slate-400">
-                            <Mail size={13} />
-                            {user.email}
-                          </p>
-                          {user.engineers[0]?.employee_id ? (
-                            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                              {user.engineers[0].employee_id}
-                            </p>
-                          ) : null}
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            {locale === "th" ? "สร้างเมื่อ" : "Created"}:{" "}
-                            {formatDateTime(user.created_at)}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            {locale === "th" ? "เข้าใช้ล่าสุด" : "Last login"}:{" "}
-                            {formatDateTime(user.last_login_at)}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-                            {locale === "th" ? "แผนก/ตำแหน่ง" : "Department/position"}:{" "}
-                            {[user.engineers[0]?.department, user.engineers[0]?.position]
-                              .filter(Boolean)
-                              .join(" / ") || "-"}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 dark:bg-blue-950 dark:text-blue-200">
-                            <Shield size={13} />
-                            {roleLabel(user.roles.role_name)}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4 text-slate-600 dark:text-slate-300">
-                          <span className="inline-flex items-center gap-1">
-                            <Phone size={13} />
-                            {user.phone || "-"}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ${
-                              user.is_active
-                                ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-200"
-                                : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"
-                            }`}
-                          >
-                            <BadgeCheck size={13} />
-                            {user.is_active ? t.status.active : t.status.disabled}
-                          </span>
-                        </td>
-                        <td className="px-5 py-4">
-                          {user.user_id === currentUser.user_id ? (
-                            <span className="text-xs font-semibold text-slate-400">
-                              {t.currentUser}
-                            </span>
-                          ) : (
-                            <div className="flex flex-wrap gap-2">
-                              <form action={toggleUserStatusAction}>
-                                <input type="hidden" name="lang" value={locale} />
-                                <input
-                                  type="hidden"
-                                  name="userId"
-                                  value={user.user_id}
-                                />
-                                <button
-                                  type="submit"
-                                  className="interactive-button h-9 rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 transition hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
-                                >
-                                  {user.is_active ? t.disable : t.enable}
-                                </button>
-                              </form>
-                              <DeleteUserButton
-                                action={deleteUserAction}
-                                userId={user.user_id}
-                                locale={locale}
-                                label={t.delete}
-                                confirmMessage={t.confirmDelete}
-                              />
-                              {user.is_active ? (
-                                <>
-                                  <form
-                                    action={sendUserMessageAction}
-                                    className="mt-2 w-full min-w-[220px] rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-700 dark:bg-slate-950"
-                                  >
-                                    <input type="hidden" name="lang" value={locale} />
-                                    <input
-                                      type="hidden"
-                                      name="userId"
-                                      value={user.user_id}
-                                    />
-                                    <label className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
-                                      <MessageSquare size={13} />
-                                      {messageText.label}
-                                    </label>
-                                    <textarea
-                                      name="message"
-                                      required
-                                      rows={2}
-                                      maxLength={500}
-                                      placeholder={messageText.placeholder}
-                                      className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
-                                    />
-                                    <button
-                                      type="submit"
-                                      className="interactive-button mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
-                                    >
-                                      <Send size={13} />
-                                      {messageText.send}
-                                    </button>
-                                  </form>
-                                <form
-                                  action={sendUserMessageAction}
-                                  className="hidden"
-                                >
-                                  <input type="hidden" name="lang" value={locale} />
-                                  <input
-                                    type="hidden"
-                                    name="userId"
-                                    value={user.user_id}
-                                  />
-                                  <label className="flex items-center gap-1 text-xs font-bold text-slate-500 dark:text-slate-400">
-                                    <MessageSquare size={13} />
-                                    {locale === "th"
-                                      ? "ส่งข้อความถึงผู้ใช้"
-                                      : "Message user"}
-                                  </label>
-                                  <textarea
-                                    name="message"
-                                    required
-                                    rows={2}
-                                    maxLength={500}
-                                    placeholder={
-                                      locale === "th"
-                                        ? "พิมพ์ข้อความ..."
-                                        : "Type a message..."
-                                    }
-                                    className="mt-2 w-full resize-none rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
-                                  />
-                                  <button
-                                    type="submit"
-                                    className="interactive-button mt-2 inline-flex h-9 w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
-                                  >
-                                    <Send size={13} />
-                                    {locale === "th" ? "ส่งข้อความ" : "Send"}
-                                  </button>
-                                </form>
-                                </>
-                              ) : null}
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+            <UserDirectory
+              users={directoryUsers}
+              currentUserId={currentUser.user_id}
+              locale={locale}
+              text={directoryText}
+            />
           </section>
         )}
       </div>

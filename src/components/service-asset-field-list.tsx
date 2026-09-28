@@ -15,6 +15,7 @@ export interface ServiceAssetSuggestion {
 export interface ServiceAssetInitialRow {
   id: string;
   actionType: "Installed" | "Delivered" | "Returned";
+  itemLineNo: number | null;
   model: string;
   serialNumber: string;
   noSerial: boolean;
@@ -29,10 +30,15 @@ interface ServiceAssetFieldListProps {
   searchUrl?: string;
   actionOptions?: Array<ServiceAssetInitialRow["actionType"]>;
   fixedActionType?: ServiceAssetInitialRow["actionType"];
+  workItemOptions?: Array<{
+    value: number;
+    label: string;
+  }>;
   labels: {
     title: string;
     help: string;
     actionType: string;
+    workItem: string;
     model: string;
     serialNumber: string;
     noSerial: string;
@@ -68,6 +74,7 @@ const createEmptyRow = (
       ? crypto.randomUUID()
       : `asset-${Date.now()}-${Math.random().toString(36).slice(2)}`,
   actionType,
+  itemLineNo: null,
   model: "",
   serialNumber: "",
   serialNumbers: [""],
@@ -137,6 +144,7 @@ export default function ServiceAssetFieldList({
   searchUrl,
   actionOptions = ["Delivered", "Installed", "Returned"],
   fixedActionType,
+  workItemOptions = [],
   labels,
 }: ServiceAssetFieldListProps) {
   const [rows, setRows] = useState<AssetRowState[]>(
@@ -403,7 +411,7 @@ export default function ServiceAssetFieldList({
               className="rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-950"
             >
               <AssetHiddenFields row={row} suggestionBySerial={suggestionBySerial} />
-              <div className="grid gap-3 lg:grid-cols-[150px_minmax(0,1fr)_minmax(0,1fr)_90px_auto]">
+              <div className="grid gap-3 lg:grid-cols-[150px_170px_minmax(0,1fr)_minmax(0,1fr)_90px_auto]">
                 <label className="block">
                   <span className="text-xs font-bold text-slate-500">
                     {labels.actionType}
@@ -444,6 +452,30 @@ export default function ServiceAssetFieldList({
                       ) : null}
                     </select>
                   )}
+                </label>
+
+                <label className="block">
+                  <span className="text-xs font-bold text-slate-500">
+                    {labels.workItem}
+                  </span>
+                  <select
+                    value={row.itemLineNo ?? ""}
+                    onChange={(event) =>
+                      updateRow(row.id, {
+                        itemLineNo: event.target.value
+                          ? Number(event.target.value)
+                          : null,
+                      })
+                    }
+                    className="mt-1 h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
+                  >
+                    <option value="">-</option>
+                    {workItemOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
                 </label>
 
                 <div>
@@ -829,6 +861,11 @@ function AssetHiddenFields({
       {entries.map((entry, index) => (
         <span key={`${row.id}-hidden-${index}`} className="hidden">
           <input type="hidden" name="assetActionTypes" value={row.actionType} />
+          <input
+            type="hidden"
+            name="assetItemLineNos"
+            value={row.itemLineNo ? String(row.itemLineNo) : ""}
+          />
           <input type="hidden" name="assetInventoryIds" value={entry.inventoryId} />
           <input type="hidden" name="assetModels" value={row.model} />
           <input type="hidden" name="assetSerialNumbers" value={entry.serialNumber} />

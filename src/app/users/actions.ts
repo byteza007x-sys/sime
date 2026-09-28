@@ -1,6 +1,8 @@
 "use server";
 
 import { randomUUID } from "crypto";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
@@ -24,6 +26,23 @@ const readText = (formData: FormData, key: string) =>
 
 const normalizeUsername = (value: string) =>
   value.trim().toLowerCase().replace(/[^a-z0-9._-]/g, "");
+
+const AVATAR_MAX_BYTES = 3 * 1024 * 1024;
+const SIGNATURE_MAX_BYTES = 3 * 1024 * 1024;
+const AVATAR_EXTENSIONS = new Map([
+  ["image/jpeg", "jpg"],
+  ["image/png", "png"],
+  ["image/webp", "webp"],
+  ["image/gif", "gif"],
+]);
+
+const avatarDiskPath = (avatarUrl: string) => {
+  const prefix = "/uploads/avatars/";
+  if (!avatarUrl.startsWith(prefix)) return null;
+
+  const fileName = path.basename(avatarUrl);
+  return path.join(process.cwd(), "public", "uploads", "avatars", fileName);
+};
 
 export async function ensureSupportedRoles() {
   await prisma.roles.upsert({
@@ -196,6 +215,219 @@ export async function createUserAction(formData: FormData) {
   revalidatePath("/users");
   revalidatePath("/owner");
   redirect(`${redirectBase}&created=1`);
+}
+
+export async function updateUserProfileAction(formData: FormData) {
+  const admin = await requireAdmin();
+  const locale = getLocale(String(formData.get("lang") ?? "en"));
+  const redirectBase = withLocale("/users", locale);
+  const redirectWithError = (error: string): never => {
+    redirect(`${redirectBase}&error=${error}`);
+  };
+  const userId = readText(formData, "userId");
+  const fullName = readText(formData, "fullName");
+  const email = readText(formData, "email").toLowerCase();
+  const phone = readText(formData, "phone");
+  const employeeId = readText(formData, "employeeId");
+  const department = readText(formData, "department");
+  const position = readText(formData, "position");
+  const avatar = formData.get("avatar");
+  const staffSignature = formData.get("staffSignature");
+
+  if (!userId) redirectWithError("user_missing");
+  if (!email.includes("@")) redirectWithError("email");
+
+  const targetUser = await prisma.users.findUnique({
+    where: { user_id: userId },
+    include: {
+      roles: true,
+      engineers: {
+        orderBy: { engineer_id: "asc" },
+        take: 1,
+      },
+    },
+  });
+
+  const validTargetUser = targetUser ?? redirectWithError("user_missing");
+  if (isOwnerUser(validTargetUser)) redirectWithError("reserved_user");
+
+  const duplicateEmail = await prisma.users.findFirst({
+    where: {
+      email,
+      user_id: { not: userId },
+    },
+    select: { user_id: true },
+  });
+  if (duplicateEmail) redirectWithError("duplicate_email");
+
+  if (employeeId) {
+    const duplicateEmployee = await prisma.engineers.findFirst({
+      where: {
+        employee_id: employeeId,
+        user_id: { not: userId },
+      },
+      select: { engineer_id: true },
+    });
+    if (duplicateEmployee) redirectWithError("employee");
+  }
+
+  let newAvatarUrl: string | null = null;
+  let newAvatarPath: string | null = null;
+  let newSignatureUrl: string | null = null;
+  let newSignaturePath: string | null = null;
+  const avatarFile = avatar instanceof File && avatar.size > 0 ? avatar : null;
+  const signatureFile =
+    staffSignature instanceof File && staffSignature.size > 0
+      ? staffSignature
+      : null;
+  const avatarExtension = avatarFile
+    ? AVATAR_EXTENSIONS.get(avatarFile.type)
+    : null;
+  const signatureExtension = signatureFile
+    ? AVATAR_EXTENSIONS.get(signatureFile.type)
+    : null;
+
+  if (avatarFile && !avatarExtension) redirectWithError("avatar_type");
+  if (avatarFile && avatarFile.size > AVATAR_MAX_BYTES) {
+    redirectWithError("avatar_size");
+  }
+  if (signatureFile && !signatureExtension) redirectWithError("signature_type");
+  if (signatureFile && signatureFile.size > SIGNATURE_MAX_BYTES) {
+    redirectWithError("signature_size");
+  }
+
+  try {
+    if (avatarFile && avatarExtension) {
+      const uploadDirectory = path.join(process.cwd(), "public", "uploads", "avatars");
+      await mkdir(uploadDirectory, { recursive: true });
+      const fileName = `${userId}-${Date.now()}-${randomUUID()}.${avatarExtension}`;
+      newAvatarPath = path.join(uploadDirectory, fileName);
+      newAvatarUrl = `/uploads/avatars/${fileName}`;
+      await writeFile(newAvatarPath, Buffer.from(await avatarFile.arrayBuffer()));
+    }
+
+    if (signatureFile && signatureExtension) {
+      const uploadDirectory = path.join(
+        process.cwd(),
+        "public",
+        "uploads",
+        "signatures",
+        "staff",
+      );
+      await mkdir(uploadDirectory, { recursive: true });
+      const fileName = `${userId}-${Date.now()}-${randomUUID()}.${signatureExtension}`;
+      newSignaturePath = path.join(uploadDirectory, fileName);
+      newSignatureUrl = `/uploads/signatures/staff/${fileName}`;
+      await writeFile(
+        newSignaturePath,
+        Buffer.from(await signatureFile.arrayBuffer()),
+      );
+    }
+  } catch {
+    if (newAvatarPath) await unlink(newAvatarPath).catch(() => {});
+    if (newSignaturePath) await unlink(newSignaturePath).catch(() => {});
+    redirectWithError("profile_failed");
+  }
+
+  const engineer = validTargetUser.engineers[0] ?? null;
+  const oldAvatarPath = engineer?.avatar_url
+    ? avatarDiskPath(engineer.avatar_url)
+    : null;
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.users.update({
+        where: { user_id: userId },
+        data: {
+          full_name: fullName || null,
+          email,
+          phone: phone || null,
+        },
+      });
+
+      const engineerData = {
+        employee_id: employeeId || null,
+        first_name: fullName || null,
+        last_name: null,
+        phone: phone || null,
+        department: department || null,
+        position: position || null,
+        ...(newAvatarUrl ? { avatar_url: newAvatarUrl } : {}),
+      };
+
+      if (engineer) {
+        await tx.engineers.update({
+          where: { engineer_id: engineer.engineer_id },
+          data: engineerData,
+        });
+      } else {
+        await tx.engineers.create({
+          data: {
+            user_id: userId,
+            ...engineerData,
+            status: "Active",
+          },
+        });
+      }
+
+      if (newSignatureUrl && signatureFile) {
+        await tx.uploaded_files.create({
+          data: {
+            file_category: "Signature",
+            file_url: newSignatureUrl,
+            original_name: signatureFile.name || "staff-signature",
+            mime_type: signatureFile.type,
+            size_bytes: BigInt(signatureFile.size),
+            uploaded_by: userId,
+          },
+        });
+      }
+
+      await tx.audit_logs.create({
+        data: {
+          user_id: admin.user_id,
+          action: "update_user_profile",
+          table_name: "users",
+          record_id: userId,
+          old_data: JSON.stringify({
+            fullName: validTargetUser.full_name,
+            email: validTargetUser.email,
+            phone: validTargetUser.phone,
+            employeeId: engineer?.employee_id,
+            department: engineer?.department,
+            position: engineer?.position,
+            avatarUrl: engineer?.avatar_url,
+          }),
+          new_data: JSON.stringify({
+            fullName,
+            email,
+            phone,
+            employeeId,
+            department,
+            position,
+            avatarUrl: newAvatarUrl || engineer?.avatar_url || null,
+            staffSignatureUrl: newSignatureUrl,
+          }),
+        },
+      });
+    });
+  } catch {
+    if (newAvatarPath) {
+      await unlink(newAvatarPath).catch(() => {});
+    }
+    if (newSignaturePath) {
+      await unlink(newSignaturePath).catch(() => {});
+    }
+    redirectWithError("profile_failed");
+  }
+
+  if (newAvatarUrl && oldAvatarPath && oldAvatarPath !== newAvatarPath) {
+    await unlink(oldAvatarPath).catch(() => {});
+  }
+
+  revalidatePath("/users");
+  revalidatePath("/owner");
+  redirect(`${redirectBase}&profile_updated=1`);
 }
 
 export async function deleteUserAction(formData: FormData) {

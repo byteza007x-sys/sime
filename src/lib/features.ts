@@ -39,12 +39,17 @@ export const featureDefinitions = [
   {
     key: "maps",
     label: "Maps / GPS",
-    description: "Map preview, GPS capture, and site distance validation.",
+    description: "Map preview and GPS capture in service work forms.",
+  },
+  {
+    key: "gps_distance_limit",
+    label: "GPS 10 km distance limit",
+    description: "Block service submissions when the captured GPS is more than 10 km from the customer site.",
   },
   {
     key: "engineer_assignment",
-    label: "Engineer assignment",
-    description: "Show engineer selection while creating service reports.",
+    label: "Job transfer",
+    description: "Show responsible-user selection while creating and transferring service jobs.",
   },
   {
     key: "qr_code",
@@ -70,12 +75,10 @@ export const ensureFeatureFlags = async () => {
           flag_key: feature.key,
         },
         update: {
-          label: feature.label,
           description: feature.description,
         },
         create: {
           flag_key: feature.key,
-          label: feature.label,
           description: feature.description,
           is_enabled: true,
         },

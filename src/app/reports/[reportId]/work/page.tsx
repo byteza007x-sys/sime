@@ -11,6 +11,7 @@ import {
   MapPin,
   Save,
   ShieldCheck,
+  UserPlus,
   UserRound,
   Wrench,
 } from "lucide-react";
@@ -19,6 +20,7 @@ import LocationCapture from "@/components/location-capture";
 import ReportCustomerPicker from "@/components/report-customer-picker";
 import ReportPhotoFieldList from "@/components/report-photo-field-list";
 import ServiceAssetFieldList from "@/components/service-asset-field-list";
+import ServiceChargeFields from "@/components/service-charge-fields";
 import ServiceWorkItemList from "@/components/service-work-item-list";
 import SignaturePad from "@/components/signature-pad";
 import StarRatingField from "@/components/star-rating-field";
@@ -27,13 +29,14 @@ import { requireUser } from "@/lib/auth";
 import { isFeatureEnabled, requireFeature } from "@/lib/features";
 import { getLocale, type Locale, type RouteSearchParams, withLocale } from "@/lib/i18n";
 import { prisma } from "@/lib/prisma";
+import { assignServiceReportAction } from "@/app/reports/[reportId]/actions";
 import { submitServiceWorkAction } from "./actions";
 
 export const dynamic = "force-dynamic";
 
 const copy = {
   en: {
-    backReports: "Service Reports",
+    backReports: "Jobs",
     backTechnicianJobs: "My jobs",
     title: "Complete Service Work",
     subtitle: "Fill service details, capture location, and collect customer signature.",
@@ -209,11 +212,8 @@ const serviceTypeOptions = [
 ] as const;
 
 const scoreFields = [
-  ["responsivenessScore", "ความรวดเร็ว / ตรงต่อเวลา", "Responsiveness / timeliness"],
-  ["staffKnowledgeScore", "ความรู้และความเป็นมืออาชีพ", "Staff competence"],
-  ["serviceQualityScore", "มารยาทและการสื่อสาร", "Courtesy and communication"],
-  ["problemSolutionScore", "การแก้ไขปัญหา / คุณภาพงาน", "Problem resolution"],
-  ["overallScore", "ความพึงพอใจโดยรวม", "Overall satisfaction"],
+  ["responsivenessScore", "การตรงต่อเวลา มารยาท ความสะอาด", "Punctuality, courtesy, cleanliness"],
+  ["problemSolutionScore", "การแก้ไขปัญหาอย่างถูกต้อง", "Correct problem resolution"],
 ] as const;
 
 const lockedForUserStatuses = new Set([
@@ -292,7 +292,7 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
       },
       service_report_topics: {
         orderBy: {
-          topic_id: "asc",
+          id: "asc",
         },
       },
       service_report_assignments: {
@@ -307,7 +307,14 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
 
   if (!report) redirect(withLocale("/reports/create", locale));
 
-  const [inventorySuggestions, customerOptions, siteOptions] = await Promise.all([
+  const [
+    inventorySuggestions,
+    customerOptions,
+    siteOptions,
+    staffSignatureOptions,
+    savedStaffSignature,
+    assigneeUsers,
+  ] = await Promise.all([
     prisma.inventory.findMany({
     where: {
       sap_is_active: {
@@ -367,6 +374,75 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
       ],
       take: 1000,
     }),
+    prisma.service_report_signatures.findMany({
+      where: {
+        signer_type: "Engineer",
+        signature_url: {
+          not: "",
+        },
+        service_reports: {
+          engineer_id: report.engineer_id,
+        },
+      },
+      select: {
+        signature_id: true,
+        signer_name: true,
+        signature_url: true,
+        signed_at: true,
+      },
+      orderBy: {
+        signed_at: "desc",
+      },
+      take: 20,
+    }),
+    prisma.uploaded_files.findFirst({
+      where: {
+        uploaded_by: report.engineers.user_id,
+        file_category: "Signature",
+      },
+      select: {
+        file_id: true,
+        file_url: true,
+        created_at: true,
+      },
+      orderBy: [
+        {
+          created_at: "desc",
+        },
+        {
+          file_id: "desc",
+        },
+      ],
+    }),
+    prisma.users.findMany({
+      where: {
+        is_active: true,
+        roles: {
+          role_name: {
+            in: ["admin", "support", "user"],
+          },
+        },
+      },
+      select: {
+        user_id: true,
+        username: true,
+        full_name: true,
+        email: true,
+        roles: {
+          select: {
+            role_name: true,
+          },
+        },
+      },
+      orderBy: [
+        {
+          full_name: "asc",
+        },
+        {
+          username: "asc",
+        },
+      ],
+    }),
   ]);
 
   const roleName = currentUser.roles.role_name;
@@ -386,6 +462,8 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
   const canSubmit =
     isAdminLike ||
     ((isAssignedEngineer || isAssignedByHandoff || isCreator) && !isLockedForUser);
+  const canAssignReport =
+    isAdminLike || isCreator || isAssignedEngineer || isAssignedByHandoff;
   const backHref =
     roleName === "admin"
       ? withLocale("/reports", locale)
@@ -410,6 +488,11 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
             resolution: report.resolution || "",
           },
         ];
+  const workItemOptionCount = Math.max(initialServiceRows.length, 10);
+  const workItemOptions = Array.from({ length: workItemOptionCount }, (_, index) => ({
+    value: index + 1,
+    label: `No.${index + 1}`,
+  }));
   const engineerName =
     [report.engineers.first_name, report.engineers.last_name]
       .filter(Boolean)
@@ -417,20 +500,35 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
     report.engineers.users.full_name ||
     report.engineers.employee_id ||
     report.engineers.users.email;
+  const automaticStaffSignature = savedStaffSignature
+    ? {
+        signature_id: -savedStaffSignature.file_id,
+        signer_name: engineerName,
+        signature_url: savedStaffSignature.file_url,
+        signed_at: savedStaffSignature.created_at,
+      }
+    : null;
+  const signatureCandidates = [
+    ...(automaticStaffSignature ? [automaticStaffSignature] : []),
+    ...staffSignatureOptions,
+  ];
+  const availableStaffSignatureOptions = signatureCandidates.filter(
+    (signature, index, signatures) =>
+      signature.signature_url !== report.engineer_signature_url &&
+      signatures.findIndex(
+        (item) => item.signature_url === signature.signature_url,
+      ) === index,
+  );
+  const defaultEngineerSignature =
+    report.engineer_signature_url || automaticStaffSignature?.signature_url || "";
   const customerSigner =
     report.customer_contacts?.full_name || report.customers.contact_person || "";
   const scoreDefault = (name: (typeof scoreFields)[number][0]) => {
     switch (name) {
       case "responsivenessScore":
         return report.satisfaction?.responsiveness_score ?? null;
-      case "staffKnowledgeScore":
-        return report.satisfaction?.staff_knowledge_score ?? null;
-      case "serviceQualityScore":
-        return report.satisfaction?.service_quality_score ?? null;
       case "problemSolutionScore":
         return report.satisfaction?.problem_solution_score ?? null;
-      case "overallScore":
-        return report.satisfaction?.overall_score ?? null;
       default:
         return null;
     }
@@ -487,6 +585,7 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
   const initialAssetRows = report.service_report_assets.map((asset) => ({
     id: String(asset.asset_id),
     actionType: asset.action_type,
+    itemLineNo: asset.item_line_no,
     model: [asset.brand, asset.model].filter(Boolean).join(" ").trim(),
     serialNumber: asset.serial_number || "",
     noSerial: !asset.serial_number,
@@ -509,6 +608,7 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
   const assetLabels = {
     help: assetHelp,
     actionType: locale === "th" ? "ประเภท" : "Type",
+    workItem: locale === "th" ? "หัวข้องาน" : "Work item",
     model: locale === "th" ? "ชื่อ / Model อุปกรณ์" : "Equipment model",
     serialNumber: locale === "th" ? "Serial number" : "Serial number",
     noSerial: locale === "th" ? "ไม่มี Serial" : "No serial number",
@@ -714,6 +814,7 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
                 initialRows={initialAssetRows}
                 searchUrl="/api/inventory/search"
                 actionOptions={["Delivered", "Installed", "Returned"]}
+                workItemOptions={workItemOptions}
                 labels={{
                   ...assetLabels,
                   title:
@@ -737,53 +838,21 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
                 </h2>
               </div>
 
-              <div className="grid gap-4 lg:grid-cols-3">
-                {[
-                  ["Free_Service", locale === "th" ? "ไม่มีค่าบริการ" : "Free service"],
-                  ["Charged", locale === "th" ? "มีค่าบริการ" : "Service charge"],
-                  ["Other", locale === "th" ? "อื่นๆ" : "Other"],
-                ].map(([value, label]) => (
-                  <label
-                    key={value}
-                    className="flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold dark:border-slate-700 dark:bg-slate-950"
-                  >
-                    <input
-                      type="radio"
-                      name="chargeType"
-                      value={value}
-                      defaultChecked={(report.charge_type || "Free_Service") === value}
-                      className="h-4 w-4"
-                    />
-                    {label}
-                  </label>
-                ))}
-              </div>
-
-              <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                <label className="block">
-                  <span className="text-sm font-bold">
-                    {locale === "th" ? "ค่าบริการ" : "Service fee"}
-                  </span>
-                  <input
-                    name="serviceFee"
-                    type="number"
-                    min={0}
-                    step="0.01"
-                    defaultValue={report.service_fee?.toString() || ""}
-                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                  />
-                </label>
-                <label className="block">
-                  <span className="text-sm font-bold">
-                    {locale === "th" ? "หมายเหตุค่าบริการ / อื่นๆ" : "Charge note / other"}
-                  </span>
-                  <input
-                    name="otherChargeNote"
-                    defaultValue={report.other_charge_note || ""}
-                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                  />
-                </label>
-              </div>
+              <ServiceChargeFields
+                initialChargeType={report.charge_type}
+                initialServiceFee={report.service_fee?.toString() || ""}
+                initialOtherChargeNote={report.other_charge_note || ""}
+                labels={{
+                  freeService: locale === "th" ? "ไม่มีค่าบริการ" : "Free service",
+                  charged: locale === "th" ? "มีค่าบริการ" : "Service charge",
+                  other: locale === "th" ? "อื่นๆ" : "Other",
+                  serviceFee: locale === "th" ? "ค่าบริการ" : "Service fee",
+                  chargeNote:
+                    locale === "th" ? "หมายเหตุค่าบริการ / อื่นๆ" : "Charge note / other",
+                  freeServiceNote:
+                    locale === "th" ? "ไม่มีค่าบริการ" : "Free service",
+                }}
+              />
 
               <div className="mt-5 grid gap-4 lg:grid-cols-2">
                 {scoreFields.map(([name, thLabel, enLabel]) => (
@@ -795,19 +864,6 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
                     emptyLabel={locale === "th" ? "ล้างคะแนน" : "Clear"}
                   />
                 ))}
-                <label className="block">
-                  <span className="text-sm font-bold">
-                    {locale === "th" ? "คะแนนแนะนำบริการ" : "NPS score"}
-                  </span>
-                  <input
-                    name="npsScore"
-                    type="number"
-                    min={0}
-                    max={10}
-                    defaultValue={report.satisfaction?.nps_score || ""}
-                    className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                  />
-                </label>
               </div>
 
               <label className="mt-4 block">
@@ -906,6 +962,8 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
                     : "Choose an image file or use the mobile camera."
                 }
                 fileLabel={t.photoFiles}
+                workItemLabel={locale === "th" ? "หัวข้องาน" : "Work item"}
+                workItemOptions={workItemOptions}
                 optimizedLabel={locale === "th" ? "ลดขนาดแล้ว" : "Optimized"}
                 originalLabel={locale === "th" ? "ใช้ไฟล์เดิม" : "Original image"}
                 removeLabel={locale === "th" ? "ลบรูป" : "Remove photo"}
@@ -917,7 +975,7 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
               />
             </section>
 
-            <section className="interactive-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+            <section className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
               <div className="mb-5 flex items-center gap-2">
                 <FileSignature className="text-blue-700 dark:text-blue-300" size={20} />
                 <h2 className="font-bold">{t.signatures}</h2>
@@ -969,11 +1027,49 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
                       className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
                     />
                   </label>
-                  <SignaturePad
-                    name="engineerSignature"
-                    label={t.engineerSignature}
-                    clearLabel={t.clearSignature}
-                  />
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.engineerSignature}</span>
+                    <select
+                      name="engineerSignature"
+                      defaultValue={defaultEngineerSignature}
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                    >
+                      <option value="">
+                        {locale === "th"
+                          ? "ยังไม่เลือกลายเซ็นเจ้าหน้าที่"
+                          : "No staff signature selected"}
+                      </option>
+                      {report.engineer_signature_url ? (
+                        <option value={report.engineer_signature_url}>
+                          {locale === "th" ? "ลายเซ็นที่บันทึกในใบงานนี้" : "Current report signature"}
+                        </option>
+                      ) : null}
+                      {availableStaffSignatureOptions.map((signature) => (
+                        <option
+                          key={signature.signature_id}
+                          value={signature.signature_url || ""}
+                        >
+                          {[
+                            signature.signer_name ||
+                              (locale === "th" ? "ลายเซ็นเจ้าหน้าที่" : "Staff signature"),
+                            signature.signed_at
+                              ? new Intl.DateTimeFormat(
+                                  locale === "th" ? "th-TH" : "en-US",
+                                  { dateStyle: "medium" },
+                                ).format(signature.signed_at)
+                              : null,
+                          ]
+                            .filter(Boolean)
+                            .join(" - ")}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="mt-2 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                      {locale === "th"
+                        ? "ระบบจะใช้ลายเซ็นที่เคยบันทึกไว้ ไม่ต้องวาดใหม่"
+                        : "Uses a previously saved staff signature; no manual drawing needed."}
+                    </p>
+                  </label>
                 </div>
               </div>
             </section>
@@ -1035,6 +1131,79 @@ export default async function WorkPage({ params, searchParams }: WorkPageProps) 
                 </p>
               </div>
             </section>
+
+            {canAssignReport ? (
+              <section className="animate-panel interactive-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="mb-4 flex items-center gap-2">
+                  <UserPlus className="text-blue-700 dark:text-blue-300" size={20} />
+                  <h2 className="font-bold">
+                    {locale === "th" ? "ส่งต่องาน" : "Transfer job"}
+                  </h2>
+                </div>
+                {isLockedForUser ? (
+                  <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                    {locale === "th"
+                      ? "งานที่ส่งตรวจหรืออนุมัติแล้วไม่สามารถส่งต่อได้"
+                      : "Submitted or approved jobs cannot be transferred."}
+                  </p>
+                ) : (
+                  <form action={assignServiceReportAction} className="space-y-3">
+                    <input type="hidden" name="lang" value={locale} />
+                    <input type="hidden" name="reportId" value={report.report_id} />
+                    <input type="hidden" name="returnTo" value="report_work" />
+                    <label className="block">
+                      <span className="text-sm font-bold">
+                        {locale === "th" ? "ส่งให้" : "Send to"}
+                      </span>
+                      <select
+                        name="assigneeUserId"
+                        required
+                        defaultValue=""
+                        className="mt-2 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-semibold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                      >
+                        <option value="">
+                          {locale === "th" ? "เลือกผู้รับงานต่อ" : "Choose assignee"}
+                        </option>
+                        {assigneeUsers.map((assigneeUser) => {
+                          const assigneeLabel =
+                            assigneeUser.full_name ||
+                            assigneeUser.username ||
+                            assigneeUser.email;
+
+                          return (
+                            <option key={assigneeUser.user_id} value={assigneeUser.user_id}>
+                              {assigneeLabel} ({assigneeUser.roles.role_name})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </label>
+                    <label className="block">
+                      <span className="text-sm font-bold">
+                        {locale === "th" ? "หมายเหตุ" : "Note"}
+                      </span>
+                      <textarea
+                        name="assignmentNote"
+                        rows={3}
+                        placeholder={
+                          locale === "th"
+                            ? "ระบุเหตุผลหรือรายละเอียดที่ต้องส่งต่องาน"
+                            : "Add transfer note or handoff detail"
+                        }
+                        className="mt-2 w-full resize-y rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                      />
+                    </label>
+                    <button
+                      type="submit"
+                      className="interactive-button inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-blue-800"
+                    >
+                      <UserPlus size={16} />
+                      {locale === "th" ? "ส่งต่องาน" : "Transfer job"}
+                    </button>
+                  </form>
+                )}
+              </section>
+            ) : null}
           </aside>
         </div>
       </div>

@@ -15,10 +15,9 @@ import {
 } from "lucide-react";
 import DeleteReportButton from "@/components/delete-report-button";
 import LanguageSwitcher from "@/components/language-switcher";
+import MobileBottomNav from "@/components/mobile-bottom-nav";
 import ThemeToggle from "@/components/theme-toggle";
-import BackupButton from "@/components/backup-button";
-import { triggerBackupAction } from "@/app/backup/actions";
-import type { service_reports_status } from "@/generated/prisma/enums";
+import type { service_report_priority, service_reports_status } from "@/generated/prisma/enums";
 import type * as Prisma from "@/generated/prisma/internal/prismaNamespace";
 import { requireUser } from "@/lib/auth";
 import { requireFeature } from "@/lib/features";
@@ -43,15 +42,14 @@ type ServiceReportStatus =
   | "Closed"
   | "Cancelled";
 
-type StatusFilter = "All" | "Action" | "Review" | "Approved" | "Closed";
+type StatusFilter = "All" | "Active" | "Submitted" | "Approved";
 type RoleName = "admin" | "support" | "user" | string;
 
 const statusFilters: StatusFilter[] = [
   "All",
-  "Action",
-  "Review",
+  "Active",
+  "Submitted",
   "Approved",
-  "Closed",
 ];
 const actionStatuses = [
   "Draft",
@@ -65,11 +63,8 @@ const actionStatuses = [
 const reviewStatuses = ["Submitted"] satisfies ServiceReportStatus[];
 const approvedStatuses = [
   "Approved",
-] satisfies ServiceReportStatus[];
-const closedStatuses = [
   "Completed",
   "Closed",
-  "Cancelled",
 ] satisfies ServiceReportStatus[];
 const supportHiddenStatuses = [
   "Completed",
@@ -78,45 +73,47 @@ const supportHiddenStatuses = [
   "Cancelled",
 ] satisfies ServiceReportStatus[];
 const statusesByFilter: Record<Exclude<StatusFilter, "All">, readonly ServiceReportStatus[]> = {
-  Action: actionStatuses,
-  Review: reviewStatuses,
+  Active: actionStatuses,
+  Submitted: reviewStatuses,
   Approved: approvedStatuses,
-  Closed: closedStatuses,
 };
 const filtersByRole = (roleName: RoleName): readonly StatusFilter[] => {
   if (roleName === "admin") return statusFilters;
-  if (roleName === "support") return ["All", "Action", "Review"];
+  if (roleName === "support") return ["All", "Active", "Submitted"];
 
-  return ["Action", "Review"];
+  return ["Active", "Submitted"];
 };
 
 const copy = {
   en: {
     backDashboard: "Dashboard",
     backHome: "Back to home",
-    title: "Service Reports",
-    subtitle: "Track service jobs, evidence, approval status, and field progress.",
-    newReport: "Create report",
+    title: "Service Jobs",
+    subtitle: "Track service jobs, approval status, and field progress.",
+    newReport: "Create Job",
     comingSoon: "Coming soon",
     search: "Search job no., customer, project, engineer...",
     searchButton: "Search",
     clear: "Clear",
-    total: "Total reports",
-    active: "Active jobs",
-    waitingReview: "Waiting review",
-    completed: "Completed",
+    total: "Total Job",
+    active: "In Progress Jobs",
+    waitingReview: "Submitted",
+    completed: "Complete Job",
     filters: "Status filters",
     all: "All",
-    tableTitle: "Report list",
-    tableHint: "Showing service reports from newest to oldest",
+    tableTitle: "Summary list",
+    tableHint: "Showing jobs from newest to oldest",
+    dateFrom: "From",
+    dateTo: "To",
+    transferHistory: "Transfer history",
     emptyTitle: "No service reports found",
     emptyDetail: "Try clearing the search or choosing another status.",
     jobNo: "Job No.",
     customer: "Customer / Site",
-    engineer: "Engineer",
+    engineer: "Technician",
     date: "Date",
     priority: "Priority",
-    evidence: "Evidence",
+    evidence: "Records",
     status: "Status",
     action: "Action",
     detail: "Detail",
@@ -133,17 +130,17 @@ const copy = {
     serviceType: "Service type",
     source: "Source",
     statusLabels: {
-      Draft: "Draft",
-      Open: "Open",
-      Assigned: "Assigned",
-      In_Progress: "In Progress",
-      On_Site: "On Site",
-      Pending_Customer: "Pending Customer",
+      Draft: "Active",
+      Open: "Active",
+      Assigned: "Active",
+      In_Progress: "Active",
+      On_Site: "Active",
+      Pending_Customer: "Active",
       Submitted: "Submitted",
-      Need_Revision: "Need Revision",
-      Completed: "Completed",
+      Need_Revision: "Active",
+      Completed: "Approved",
       Approved: "Approved",
-      Closed: "Closed",
+      Closed: "Approved",
       Cancelled: "Cancelled",
       Unknown: "Unknown",
     },
@@ -164,8 +161,11 @@ const copy = {
     completed: "เสร็จสิ้น",
     filters: "กรองตามสถานะ",
     all: "ทั้งหมด",
-    tableTitle: "รายการใบเซอร์วิซ",
+    tableTitle: "Summary list",
     tableHint: "แสดงใบงานจากล่าสุดไปเก่าสุด",
+    dateFrom: "จากวันที่",
+    dateTo: "ถึงวันที่",
+    transferHistory: "ประวัติส่งต่อ",
     emptyTitle: "ไม่พบใบเซอร์วิซ",
     emptyDetail: "ลองล้างคำค้นหาหรือเลือกสถานะอื่น",
     jobNo: "เลขที่งาน",
@@ -196,11 +196,11 @@ const copy = {
       In_Progress: "กำลังดำเนินการ",
       On_Site: "ถึงหน้างาน",
       Pending_Customer: "รอลูกค้า",
-      Submitted: "ส่งตรวจแล้ว",
-      Need_Revision: "ต้องแก้ไข",
-      Completed: "เสร็จสิ้น",
-      Approved: "อนุมัติแล้ว",
-      Closed: "ปิดงาน",
+      Submitted: "Submitted",
+      Need_Revision: "Active",
+      Completed: "Approved",
+      Approved: "Approved",
+      Closed: "Approved",
       Cancelled: "ยกเลิก",
       Unknown: "ไม่ทราบสถานะ",
     },
@@ -224,8 +224,11 @@ const thaiCopy = {
   completed: "เสร็จสิ้น",
   filters: "กรองตามสถานะ",
   all: "ทั้งหมด",
-  tableTitle: "รายการใบเซอร์วิซ",
+  tableTitle: "Summary list",
   tableHint: "แสดงใบงานจากล่าสุดไปเก่าสุด",
+  dateFrom: "จากวันที่",
+  dateTo: "ถึงวันที่",
+  transferHistory: "ประวัติส่งต่อ",
   emptyTitle: "ไม่พบใบเซอร์วิซ",
   emptyDetail: "ลองล้างคำค้นหาหรือเลือกสถานะอื่น",
   jobNo: "เลขงาน",
@@ -256,11 +259,11 @@ const thaiCopy = {
     In_Progress: "กำลังดำเนินการ",
     On_Site: "ถึงหน้างาน",
     Pending_Customer: "รอลูกค้า",
-    Submitted: "ส่งตรวจแล้ว",
-    Need_Revision: "ต้องแก้ไข",
-    Completed: "เสร็จสิ้น",
-    Approved: "อนุมัติแล้ว",
-    Closed: "ปิดงาน",
+    Submitted: "Submitted",
+    Need_Revision: "Active",
+    Completed: "Approved",
+    Approved: "Approved",
+    Closed: "Approved",
     Cancelled: "ยกเลิก",
     Unknown: "ไม่ทราบสถานะ",
   },
@@ -271,6 +274,8 @@ const isStatusFilter = (value: string | undefined): value is StatusFilter =>
 
 const normalize = (value: string | null | undefined) =>
   String(value ?? "").trim().toLowerCase();
+
+const priorityValues = new Set(["Low", "Normal", "High", "Urgent"]);
 
 const formatDate = (date: Date | null, locale: Locale, fallback: string) => {
   if (!date) return fallback;
@@ -330,14 +335,12 @@ const statusFilterLabel = (
   switch (status) {
     case "All":
       return t.all;
-    case "Action":
+    case "Active":
       return t.active;
-    case "Review":
+    case "Submitted":
       return t.waitingReview;
     case "Approved":
       return t.statusLabels.Approved;
-    case "Closed":
-      return t.statusLabels.Closed;
   }
 };
 
@@ -356,15 +359,20 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
     Array.isArray(params.q) ? params.q[0] : params.q ?? "",
   ).trim();
   const query = normalize(queryText);
+  const jobNoText = String(Array.isArray(params.jobNo) ? params.jobNo[0] : params.jobNo ?? "").trim();
+  const customerText = String(Array.isArray(params.customer) ? params.customer[0] : params.customer ?? "").trim();
+  const siteText = String(Array.isArray(params.site) ? params.site[0] : params.site ?? "").trim();
+  const priorityText = String(Array.isArray(params.priority) ? params.priority[0] : params.priority ?? "").trim();
+  const createdByText = String(Array.isArray(params.createdBy) ? params.createdBy[0] : params.createdBy ?? "").trim();
+  const requestedFromText = String(Array.isArray(params.from) ? params.from[0] : params.from ?? "").trim();
+  const requestedToText = String(Array.isArray(params.to) ? params.to[0] : params.to ?? "").trim();
   const engineerIds = currentUser.engineers.map((engineer) => engineer.engineer_id);
   const roleName = currentUser.roles.role_name.trim().toLowerCase();
   const isAdmin = roleName === "admin";
   const isSupport = roleName === "support";
-  const canBackup = isAdmin || isOwnerUser(currentUser);
   const shouldUseDashboardHome = isAdmin || isOwnerUser(currentUser);
   const homeHref = shouldUseDashboardHome ? "/dashboard" : "/technician/jobs";
   const homeLabel = t.backHome;
-  const backupStatus = Array.isArray(params.backup) ? params.backup[0] : params.backup;
   const availableStatusFilters = filtersByRole(currentUser.roles.role_name);
   const requestedStatus = Array.isArray(params.status)
     ? params.status[0]
@@ -407,6 +415,33 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           },
         ],
       };
+  const firstReport = await prisma.service_reports.findFirst({
+    where: visibilityWhere,
+    select: {
+      created_at: true,
+    },
+    orderBy: {
+      created_at: "asc",
+    },
+  });
+  const today = new Date();
+  const defaultFrom = firstReport?.created_at ?? new Date(today.getFullYear(), today.getMonth(), 1);
+  const defaultTo = today;
+  const dateInputValue = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`;
+  };
+  const fromText = requestedFromText || dateInputValue(defaultFrom);
+  const toText = requestedToText || dateInputValue(defaultTo);
+  const fromDate = new Date(`${fromText}T00:00:00`);
+  const toDate = new Date(`${toText}T23:59:59.999`);
+  const hasValidDateRange =
+    !Number.isNaN(fromDate.getTime()) &&
+    !Number.isNaN(toDate.getTime()) &&
+    fromDate <= toDate;
   const searchWhere: Prisma.service_reportsWhereInput = queryText
     ? {
         OR: [
@@ -465,6 +500,74 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         ],
       }
     : {};
+  const advancedSearchWhere: Prisma.service_reportsWhereInput = {
+    AND: [
+      jobNoText ? { job_number: { contains: jobNoText } } : {},
+      customerText
+        ? {
+            customers: {
+              company_name: {
+                contains: customerText,
+              },
+            },
+          }
+        : {},
+      siteText
+        ? {
+            OR: [
+              {
+                customer_sites: {
+                  site_name: {
+                    contains: siteText,
+                  },
+                },
+              },
+              {
+                customer_sites: {
+                  address: {
+                    contains: siteText,
+                  },
+                },
+              },
+            ],
+          }
+        : {},
+      priorityText && priorityValues.has(priorityText)
+        ? { priority: { equals: priorityText as service_report_priority } }
+        : {},
+      createdByText
+        ? {
+            created_by_user: {
+              OR: [
+                {
+                  full_name: {
+                    contains: createdByText,
+                  },
+                },
+                {
+                  username: {
+                    contains: createdByText,
+                  },
+                },
+                {
+                  email: {
+                    contains: createdByText,
+                  },
+                },
+              ],
+            },
+          }
+        : {},
+      hasValidDateRange
+        ? {
+            created_at: {
+              gte: fromDate,
+              lte: toDate,
+            },
+          }
+        : {},
+    ],
+  };
   const statusWhere: Prisma.service_reportsWhereInput =
     selectedStatus === "All"
       ? {}
@@ -474,7 +577,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           },
         };
   const reportWhere: Prisma.service_reportsWhereInput = {
-    AND: [visibilityWhere, statusWhere, searchWhere],
+    AND: [visibilityWhere, statusWhere, searchWhere, advancedSearchWhere],
   };
 
   const [reports, totalReports, activeReports, waitingReview, completedReports] =
@@ -515,6 +618,40 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               last_name: true,
               employee_id: true,
             },
+          },
+          service_report_assignments: {
+            select: {
+              assignment_id: true,
+              assigned_at: true,
+              assignment_role: true,
+              status: true,
+              note: true,
+              engineers: {
+                select: {
+                  first_name: true,
+                  last_name: true,
+                  employee_id: true,
+                  users: {
+                    select: {
+                      full_name: true,
+                      username: true,
+                      email: true,
+                    },
+                  },
+                },
+              },
+              users: {
+                select: {
+                  full_name: true,
+                  username: true,
+                  email: true,
+                },
+              },
+            },
+            orderBy: {
+              assigned_at: "desc",
+            },
+            take: 3,
           },
           _count: {
             select: {
@@ -562,7 +699,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             visibilityWhere,
             {
               status: {
-                in: closedStatuses as service_reports_status[],
+                in: approvedStatuses as service_reports_status[],
               },
             },
           ],
@@ -573,6 +710,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   const buildReportsHref = (status: StatusFilter) => {
     const nextParams = new URLSearchParams({ lang: locale });
     if (query) nextParams.set("q", query);
+    if (jobNoText) nextParams.set("jobNo", jobNoText);
+    if (customerText) nextParams.set("customer", customerText);
+    if (siteText) nextParams.set("site", siteText);
+    if (priorityText) nextParams.set("priority", priorityText);
+    if (createdByText) nextParams.set("createdBy", createdByText);
+    if (fromText) nextParams.set("from", fromText);
+    if (toText) nextParams.set("to", toText);
     if (status !== "All") nextParams.set("status", status);
 
     return `/reports?${nextParams.toString()}`;
@@ -586,7 +730,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
   ] as const;
 
   return (
-    <main className="animate-page min-h-screen bg-[#f3f6fb] px-4 py-5 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6">
+    <main className="animate-page min-h-screen bg-[#f3f6fb] px-4 py-5 pb-24 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6 md:pb-5">
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="animate-panel rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
@@ -617,14 +761,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             <div className="flex flex-wrap items-center gap-3">
               <LanguageSwitcher locale={locale} pathname="/reports" />
               <ThemeToggle />
-              {canBackup ? (
-                <BackupButton
-                  action={triggerBackupAction}
-                  locale={locale}
-                  returnTo="/reports"
-                  source="reports"
-                />
-              ) : null}
               <Link
                 href={withLocale("/reports/create", locale)}
                 className="interactive-button inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-blue-700 px-4 text-sm font-bold text-white shadow-sm hover:bg-blue-800"
@@ -635,24 +771,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             </div>
           </div>
         </header>
-
-        {backupStatus === "success" || backupStatus === "failed" ? (
-          <section
-            className={`rounded-xl border px-5 py-4 text-sm font-bold ${
-              backupStatus === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
-            }`}
-          >
-            {backupStatus === "success"
-              ? locale === "th"
-                ? "สำรองข้อมูลเรียบร้อยแล้ว"
-                : "Backup completed."
-              : locale === "th"
-                ? "สำรองข้อมูลไม่สำเร็จ กรุณาตรวจสอบหน้า System"
-                : "Backup failed. Please check the System page."}
-          </section>
-        ) : null}
 
         <section className="stagger-list grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
           {stats.map(([label, value, Icon, tone]) => (
@@ -676,24 +794,25 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </section>
 
         <section className="animate-panel rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-          <form action="/reports" className="grid gap-3 lg:grid-cols-[1fr_auto]">
+          <form action="/reports" className="grid gap-3">
             <input type="hidden" name="lang" value={locale} />
             {selectedStatus !== "All" ? (
               <input type="hidden" name="status" value={selectedStatus} />
             ) : null}
-            <label className="relative block">
-              <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                size={17}
-              />
-              <input
-                name="q"
-                defaultValue={queryText}
-                placeholder={t.search}
-                className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900"
-              />
-            </label>
-            <div className="flex gap-2">
+            <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+              <label className="relative block">
+                <Search
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
+                  size={17}
+                />
+                <input
+                  name="q"
+                  defaultValue={queryText}
+                  placeholder={t.search}
+                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900"
+                />
+              </label>
+              <div className="flex gap-2">
               <button
                 type="submit"
                 className="interactive-button inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blue-700 px-5 text-sm font-bold text-white shadow-sm hover:bg-blue-800 lg:flex-none"
@@ -707,6 +826,64 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               >
                 {t.clear}
               </Link>
+              </div>
+            </div>
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              <input
+                name="jobNo"
+                defaultValue={jobNoText}
+                placeholder={locale === "th" ? "เลขงาน" : "Job No"}
+                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+              />
+              <input
+                name="customer"
+                defaultValue={customerText}
+                placeholder={locale === "th" ? "ลูกค้า" : "Customer"}
+                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+              />
+              <input
+                name="site"
+                defaultValue={siteText}
+                placeholder={locale === "th" ? "สถานที่" : "Site"}
+                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+              />
+              <select
+                name="priority"
+                defaultValue={priorityText}
+                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+              >
+                <option value="">{locale === "th" ? "ทุกความสำคัญ" : "Any priority"}</option>
+                <option value="Low">Low</option>
+                <option value="Normal">Normal</option>
+                <option value="High">High</option>
+                <option value="Urgent">Urgent</option>
+              </select>
+              <input
+                name="createdBy"
+                defaultValue={createdByText}
+                placeholder={locale === "th" ? "ผู้เขียน" : "Created by"}
+                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+              />
+              <label className="block">
+                <span className="sr-only">{t.dateFrom}</span>
+                <input
+                  name="from"
+                  type="date"
+                  defaultValue={fromText}
+                  aria-label={t.dateFrom}
+                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
+              <label className="block">
+                <span className="sr-only">{t.dateTo}</span>
+                <input
+                  name="to"
+                  type="date"
+                  defaultValue={toText}
+                  aria-label={t.dateTo}
+                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                />
+              </label>
             </div>
           </form>
 
@@ -761,7 +938,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
             </div>
           ) : (
             <>
-            <div className="grid gap-3 p-4 lg:hidden">
+            <div className="grid gap-3 p-4 md:hidden">
               {reports.map((report) => {
                 const engineerName =
                   [report.engineers.first_name, report.engineers.last_name]
@@ -776,6 +953,25 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   t.unassigned;
                 const serviceDate =
                   report.scheduled_date ?? report.date_issued ?? report.created_at;
+                const latestAssignment = report.service_report_assignments[0] ?? null;
+                const latestAssignee = latestAssignment
+                  ? [
+                      latestAssignment.engineers.first_name,
+                      latestAssignment.engineers.last_name,
+                    ]
+                      .filter(Boolean)
+                      .join(" ") ||
+                    latestAssignment.engineers.users.full_name ||
+                    latestAssignment.engineers.users.username ||
+                    latestAssignment.engineers.employee_id ||
+                    latestAssignment.engineers.users.email
+                  : null;
+                const latestAssignedBy = latestAssignment
+                  ? latestAssignment.users?.full_name ||
+                    latestAssignment.users?.username ||
+                    latestAssignment.users?.email ||
+                    t.unassigned
+                  : null;
                 const isLockedForUser =
                   !isAdmin &&
                   ["Submitted", "Completed", "Approved", "Closed", "Cancelled"].includes(
@@ -828,6 +1024,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                         <CalendarDays size={15} />
                         {formatDate(serviceDate, locale, t.noDate)}
                       </p>
+                      {latestAssignment ? (
+                        <p className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs font-semibold text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+                          {t.transferHistory}: {latestAssignee} / {latestAssignedBy}
+                        </p>
+                      ) : null}
                     </div>
 
                     <div className="mt-4 flex flex-wrap gap-2">
@@ -847,30 +1048,35 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                     </div>
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <Link
-                        href={withLocale(`/reports/${report.report_id}`, locale)}
-                        className="interactive-button inline-flex h-10 items-center justify-center rounded-lg bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
-                      >
-                        {t.detail}
-                      </Link>
                       {isLockedForUser ? (
                         <Link
                           href={withLocale(
                             `/reports/${report.report_id}/service-form`,
                             locale,
                           )}
-                          className="interactive-button inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
+                          className="interactive-button inline-flex h-11 items-center justify-center rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800 sm:col-span-2"
                         >
                           {t.previewForm}
                         </Link>
                       ) : (
                         <Link
                           href={withLocale(`/reports/${report.report_id}/work`, locale)}
-                          className="interactive-button inline-flex h-10 items-center justify-center rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
+                          className="interactive-button inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-3 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
                         >
                           {t.openWork}
                         </Link>
                       )}
+                      {!isLockedForUser ? (
+                        <Link
+                          href={withLocale(
+                            `/reports/${report.report_id}/service-form`,
+                            locale,
+                          )}
+                          className="interactive-button inline-flex h-11 items-center justify-center rounded-lg bg-blue-700 px-3 text-xs font-bold text-white hover:bg-blue-800"
+                        >
+                          {t.previewForm}
+                        </Link>
+                      ) : null}
                       {canDelete ? (
                         <div className="sm:col-span-2">
                           <DeleteReportButton
@@ -888,7 +1094,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               })}
             </div>
 
-            <div className="hidden overflow-x-auto lg:block">
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[1080px]">
                 <thead className="bg-slate-50 text-left text-xs font-bold text-slate-500 dark:bg-slate-950 dark:text-slate-400">
                   <tr>
@@ -918,6 +1124,25 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                       t.unassigned;
                     const serviceDate =
                       report.scheduled_date ?? report.date_issued ?? report.created_at;
+                    const latestAssignment = report.service_report_assignments[0] ?? null;
+                    const latestAssignee = latestAssignment
+                      ? [
+                          latestAssignment.engineers.first_name,
+                          latestAssignment.engineers.last_name,
+                        ]
+                          .filter(Boolean)
+                          .join(" ") ||
+                        latestAssignment.engineers.users.full_name ||
+                        latestAssignment.engineers.users.username ||
+                        latestAssignment.engineers.employee_id ||
+                        latestAssignment.engineers.users.email
+                      : null;
+                    const latestAssignedBy = latestAssignment
+                      ? latestAssignment.users?.full_name ||
+                        latestAssignment.users?.username ||
+                        latestAssignment.users?.email ||
+                        t.unassigned
+                      : null;
                     const isLockedForUser =
                       !isAdmin &&
                       ["Submitted", "Completed", "Approved", "Closed", "Cancelled"].includes(
@@ -962,6 +1187,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                             <UserRound size={14} />
                             {engineerName}
                           </span>
+                          {latestAssignment ? (
+                            <p className="mt-2 max-w-[220px] rounded-lg border border-blue-100 bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-800 dark:border-blue-900 dark:bg-blue-950/30 dark:text-blue-200">
+                              {t.transferHistory}: {latestAssignee}
+                              <br />
+                              {latestAssignedBy}
+                            </p>
+                          ) : null}
                         </td>
                         <td className="px-5 py-4 align-top text-slate-600 dark:text-slate-300">
                           <span className="inline-flex items-center gap-1">
@@ -1002,15 +1234,6 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                         </td>
                         <td className="px-5 py-4 align-top">
                           <div className="flex flex-col gap-2">
-                            <Link
-                              href={withLocale(
-                                `/reports/${report.report_id}`,
-                                locale,
-                              )}
-                              className="interactive-button inline-flex h-9 items-center justify-center rounded-lg bg-slate-950 px-3 text-xs font-bold text-white hover:bg-slate-800 dark:bg-slate-100 dark:text-slate-950 dark:hover:bg-white"
-                            >
-                              {t.detail}
-                            </Link>
                             {isLockedForUser ? (
                               <span className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-3 text-xs font-bold text-slate-400 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-500">
                                 {statusLabel(report.status, t.statusLabels)}
@@ -1056,6 +1279,12 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           )}
         </section>
       </div>
+      <MobileBottomNav
+        locale={locale}
+        active="reports"
+        homeHref={homeHref}
+        showQr={shouldUseDashboardHome}
+      />
     </main>
   );
 }

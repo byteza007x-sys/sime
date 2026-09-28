@@ -1,10 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ArrowLeft, Boxes, Download, EyeOff, Hash, Layers3, Search, Tag } from "lucide-react";
-import BackupButton from "@/components/backup-button";
 import LanguageSwitcher from "@/components/language-switcher";
+import MobileBottomNav from "@/components/mobile-bottom-nav";
 import ThemeToggle from "@/components/theme-toggle";
-import { triggerBackupAction } from "@/app/backup/actions";
 import { requireUser } from "@/lib/auth";
 import { requireFeature } from "@/lib/features";
 import { getLocale, type Locale, type RouteSearchParams, withLocale } from "@/lib/i18n";
@@ -92,7 +91,6 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   const user = await requireUser(locale);
   await requireFeature({ key: "inventory", user, locale });
   const t = locale === "th" ? thaiCopy : copy.en;
-  const backupStatus = Array.isArray(params.backup) ? params.backup[0] : params.backup;
 
   if (user.roles.role_name !== "admin" && !isOwnerUser(user)) {
     redirect(withLocale("/reports", locale));
@@ -242,7 +240,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
   );
 
   return (
-    <main className="min-h-screen bg-[#f3f6fb] px-4 py-5 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6">
+    <main className="min-h-screen bg-[#f3f6fb] px-4 py-5 pb-24 text-slate-950 dark:bg-slate-950 dark:text-slate-100 sm:px-6 md:pb-5">
       <div className="mx-auto max-w-7xl space-y-5">
         <header className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -269,33 +267,9 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
             <div className="flex items-center gap-3">
               <LanguageSwitcher locale={locale} pathname="/inventory" />
               <ThemeToggle />
-              <BackupButton
-                action={triggerBackupAction}
-                locale={locale}
-                returnTo="/inventory"
-                source="inventory"
-              />
             </div>
           </div>
         </header>
-
-        {backupStatus === "success" || backupStatus === "failed" ? (
-          <section
-            className={`rounded-xl border px-5 py-4 text-sm font-bold ${
-              backupStatus === "success"
-                ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-200"
-                : "border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900 dark:bg-rose-950/40 dark:text-rose-200"
-            }`}
-          >
-            {backupStatus === "success"
-              ? locale === "th"
-                ? "สำรองข้อมูลเรียบร้อยแล้ว"
-                : "Backup completed."
-              : locale === "th"
-                ? "สำรองข้อมูลไม่สำเร็จ กรุณาตรวจสอบหน้า System"
-                : "Backup failed. Please check the System page."}
-          </section>
-        ) : null}
 
         <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
           <form action="/inventory" className="grid gap-3 lg:grid-cols-[1fr_auto_auto_auto_auto]">
@@ -414,6 +388,7 @@ export default async function InventoryPage({ searchParams }: InventoryPageProps
           </section>
         )}
       </div>
+      <MobileBottomNav locale={locale} homeHref="/dashboard" />
     </main>
   );
 }

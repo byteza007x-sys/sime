@@ -72,7 +72,7 @@ export default function ServiceWorkItemList({
           className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-950"
         >
           <div className="mb-3 flex items-center justify-between gap-3">
-            <p className="text-sm font-bold">#{index + 1}</p>
+            <p className="text-sm font-bold">No.{index + 1}</p>
             <button
               type="button"
               onClick={() =>
