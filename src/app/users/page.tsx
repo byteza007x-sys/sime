@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { ArrowLeft, UserPlus, Users } from "lucide-react";
+import { ArrowLeft, Users } from "lucide-react";
+import CreateUserDrawer from "@/components/create-user-drawer";
 import LanguageSwitcher from "@/components/language-switcher";
 import ThemeToggle from "@/components/theme-toggle";
 import UserDirectory, { type DirectoryUser } from "@/components/user-directory";
@@ -8,6 +9,7 @@ import { requireFeature } from "@/lib/features";
 import { getLocale, type Locale, type RouteSearchParams, withLocale } from "@/lib/i18n";
 import { isOwnerUser, OWNER_USERNAME } from "@/lib/owner";
 import { prisma } from "@/lib/prisma";
+import { normalizeUploadUrl } from "@/lib/upload-urls";
 import { createUserAction, ensureSupportedRoles } from "./actions";
 
 export const dynamic = "force-dynamic";
@@ -466,8 +468,8 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
               department: primaryEngineer?.department || "",
               position: primaryEngineer?.position || "",
               status: primaryEngineer?.status || "",
-              avatarUrl: primaryEngineer?.avatar_url || "",
-              signatureUrl: user.uploaded_files[0]?.file_url || "",
+              avatarUrl: normalizeUploadUrl(primaryEngineer?.avatar_url) || "",
+              signatureUrl: normalizeUploadUrl(user.uploaded_files[0]?.file_url) || "",
             },
             stats: {
               createdJobs,
@@ -540,9 +542,119 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <LanguageSwitcher locale={locale} pathname="/users" />
-            <ThemeToggle />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-lg shadow-sm transition hover:shadow-md">
+              <LanguageSwitcher locale={locale} pathname="/users" />
+            </div>
+            <div className="rounded-lg shadow-sm transition hover:shadow-md">
+              <ThemeToggle />
+            </div>
+            {isAdmin ? (
+              <CreateUserDrawer
+                title={t.createUser}
+                triggerLabel={t.createUser}
+                closeLabel={t.directory.cancel}
+              >
+                <form action={createUserAction} className="grid gap-4 sm:grid-cols-2">
+                  <input type="hidden" name="lang" value={locale} />
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.username}</span>
+                    <input
+                      name="username"
+                      required
+                      minLength={3}
+                      pattern="[A-Za-z0-9._-]+"
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-blue-950"
+                      placeholder={t.usernamePlaceholder}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.fullName}</span>
+                    <input
+                      name="fullName"
+                      required
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-blue-950"
+                      placeholder={t.fullNamePlaceholder}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.email}</span>
+                    <input
+                      name="email"
+                      type="email"
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-blue-950"
+                      placeholder="user@e-service.local"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.password}</span>
+                    <input
+                      name="password"
+                      type="password"
+                      required
+                      minLength={8}
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-blue-950"
+                      placeholder={t.passwordPlaceholder}
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.role}</span>
+                    <select
+                      name="roleId"
+                      required
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-blue-950"
+                    >
+                      {roles.map((role) => (
+                        <option key={role.role_id} value={role.role_id}>
+                          {roleLabel(role.role_name)}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label className="block">
+                    <span className="text-sm font-bold">{t.phone}</span>
+                    <input
+                      name="phone"
+                      className="mt-2 h-11 w-full rounded-lg border border-slate-300 bg-slate-50 px-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:ring-blue-950"
+                      placeholder={t.phonePlaceholder}
+                    />
+                  </label>
+
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950 sm:col-span-2">
+                    <p className="mb-3 text-sm font-bold">{t.userDetails}</p>
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <input
+                        name="employeeId"
+                        className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
+                        placeholder={t.employeeIdPlaceholder}
+                      />
+                      <input
+                        name="department"
+                        className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
+                        placeholder={t.departmentPlaceholder}
+                      />
+                      <input
+                        name="position"
+                        className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
+                        placeholder={t.positionPlaceholder}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="interactive-button h-11 w-full rounded-lg bg-blue-700 text-sm font-bold text-white shadow-[0_6px_16px_rgba(29,78,216,0.2)] transition hover:bg-blue-800 sm:col-span-2"
+                  >
+                    {t.createButton}
+                  </button>
+                </form>
+              </CreateUserDrawer>
+            ) : null}
           </div>
         </header>
 
@@ -564,115 +676,7 @@ export default async function UsersPage({ searchParams }: UsersPageProps) {
             <p className="mt-1 text-sm">{t.adminRequiredDetail}</p>
           </section>
         ) : (
-          <section className="grid gap-6 xl:grid-cols-[380px_1fr]">
-            <div className="animate-panel interactive-card rounded-2xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <div className="mb-5 flex items-center gap-2">
-                <UserPlus className="text-blue-700 dark:text-blue-300" size={20} />
-                <h2 className="font-bold">{t.createUser}</h2>
-              </div>
-
-              <form action={createUserAction} className="space-y-4">
-                <input type="hidden" name="lang" value={locale} />
-                <label className="block">
-                  <span className="text-sm font-bold">{t.username}</span>
-                  <input
-                    name="username"
-                    required
-                    minLength={3}
-                    pattern="[A-Za-z0-9._-]+"
-                    className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                    placeholder={t.usernamePlaceholder}
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-bold">{t.fullName}</span>
-                  <input
-                    name="fullName"
-                    required
-                    className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                    placeholder={t.fullNamePlaceholder}
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-bold">{t.email}</span>
-                  <input
-                    name="email"
-                    type="email"
-                    className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                    placeholder="user@e-service.local"
-                  />
-                </label>
-
-                <label className="block">
-                  <span className="text-sm font-bold">{t.password}</span>
-                  <input
-                    name="password"
-                    type="password"
-                    required
-                    minLength={8}
-                    className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                    placeholder={t.passwordPlaceholder}
-                  />
-                </label>
-
-                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                  <label className="block">
-                    <span className="text-sm font-bold">{t.role}</span>
-                    <select
-                      name="roleId"
-                      required
-                      className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                    >
-                      {roles.map((role) => (
-                        <option key={role.role_id} value={role.role_id}>
-                          {roleLabel(role.role_name)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label className="block">
-                    <span className="text-sm font-bold">{t.phone}</span>
-                    <input
-                      name="phone"
-                      className="mt-2 h-10 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
-                      placeholder={t.phonePlaceholder}
-                    />
-                  </label>
-                </div>
-
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-800 dark:bg-slate-950">
-                  <p className="mb-3 text-sm font-bold">{t.userDetails}</p>
-                  <div className="space-y-3">
-                    <input
-                      name="employeeId"
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder={t.employeeIdPlaceholder}
-                    />
-                    <input
-                      name="department"
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder={t.departmentPlaceholder}
-                    />
-                    <input
-                      name="position"
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-900"
-                      placeholder={t.positionPlaceholder}
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="interactive-button h-11 w-full rounded-lg bg-blue-700 text-sm font-bold text-white transition hover:bg-blue-800"
-                >
-                  {t.createButton}
-                </button>
-              </form>
-            </div>
-
+          <section>
             <UserDirectory
               users={directoryUsers}
               currentUserId={currentUser.user_id}

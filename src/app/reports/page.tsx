@@ -10,6 +10,7 @@ import {
   MapPin,
   Plus,
   Search,
+  SlidersHorizontal,
   UserRound,
   Wrench,
 } from "lucide-react";
@@ -773,13 +774,21 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
         </header>
 
         <section className="stagger-list grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-          {stats.map(([label, value, Icon, tone]) => (
+          {stats.map(([label, value, Icon, tone], index) => (
             <div
               key={label}
-              className="interactive-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+              className={`interactive-card rounded-xl border border-slate-200/80 border-l-4 bg-white p-5 shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900 ${
+                index === 0
+                  ? "border-l-blue-500"
+                  : index === 1
+                    ? "border-l-amber-500"
+                    : index === 2
+                      ? "border-l-violet-500"
+                      : "border-l-emerald-500"
+              }`}
             >
               <div className="flex items-center gap-4">
-                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${tone}`}>
+                <div className={`flex h-12 w-12 items-center justify-center rounded-lg ring-1 ring-inset ring-black/[0.03] dark:ring-white/[0.06] ${tone}`}>
                   <Icon size={22} />
                 </div>
                 <div>
@@ -793,13 +802,13 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
           ))}
         </section>
 
-        <section className="animate-panel rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
+        <section className="animate-panel rounded-xl border border-slate-200/80 bg-white p-4 shadow-[0_8px_24px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900">
           <form action="/reports" className="grid gap-3">
             <input type="hidden" name="lang" value={locale} />
             {selectedStatus !== "All" ? (
               <input type="hidden" name="status" value={selectedStatus} />
             ) : null}
-            <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+            <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
               <label className="relative block">
                 <Search
                   className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
@@ -809,7 +818,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   name="q"
                   defaultValue={queryText}
                   placeholder={t.search}
-                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-400 focus:bg-white dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-slate-50 pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:text-slate-100 dark:placeholder:text-slate-500 dark:focus:bg-slate-900 dark:focus:ring-blue-950"
                 />
               </label>
               <div className="flex gap-2">
@@ -822,35 +831,56 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
               </button>
               <Link
                 href={withLocale("/reports", locale)}
-                className="interactive-button inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 px-4 text-sm font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800"
+                className="interactive-button inline-flex h-11 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
               >
                 {t.clear}
               </Link>
               </div>
             </div>
-            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+            <details
+              open={Boolean(
+                jobNoText ||
+                  customerText ||
+                  siteText ||
+                  priorityText ||
+                  createdByText ||
+                  fromText ||
+                  toText,
+              )}
+              className="group rounded-lg border border-slate-200 bg-slate-50/70 dark:border-slate-800 dark:bg-slate-950/60"
+            >
+              <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-sm font-bold text-slate-700 transition hover:bg-slate-100 dark:text-slate-200 dark:hover:bg-slate-800/70 [&::-webkit-details-marker]:hidden">
+                <span className="inline-flex items-center gap-2">
+                  <SlidersHorizontal size={16} className="text-blue-700 dark:text-blue-300" />
+                  {locale === "th" ? "ตัวกรองขั้นสูง" : "Advanced filters"}
+                </span>
+                <span className="text-xs font-semibold text-slate-400 transition group-open:rotate-180">
+                  ▼
+                </span>
+              </summary>
+              <div className="grid gap-3 border-t border-slate-200 p-3 md:grid-cols-2 xl:grid-cols-5 dark:border-slate-800">
               <input
                 name="jobNo"
                 defaultValue={jobNoText}
                 placeholder={locale === "th" ? "เลขงาน" : "Job No"}
-                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
               />
               <input
                 name="customer"
                 defaultValue={customerText}
                 placeholder={locale === "th" ? "ลูกค้า" : "Customer"}
-                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
               />
               <input
                 name="site"
                 defaultValue={siteText}
                 placeholder={locale === "th" ? "สถานที่" : "Site"}
-                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
               />
               <select
                 name="priority"
                 defaultValue={priorityText}
-                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
               >
                 <option value="">{locale === "th" ? "ทุกความสำคัญ" : "Any priority"}</option>
                 <option value="Low">Low</option>
@@ -862,7 +892,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                 name="createdBy"
                 defaultValue={createdByText}
                 placeholder={locale === "th" ? "ผู้เขียน" : "Created by"}
-                className="h-11 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                className="h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
               />
               <label className="block">
                 <span className="sr-only">{t.dateFrom}</span>
@@ -871,7 +901,7 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   type="date"
                   defaultValue={fromText}
                   aria-label={t.dateFrom}
-                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
                 />
               </label>
               <label className="block">
@@ -881,10 +911,11 @@ export default async function ReportsPage({ searchParams }: ReportsPageProps) {
                   type="date"
                   defaultValue={toText}
                   aria-label={t.dateTo}
-                  className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                  className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100/60 dark:border-slate-700 dark:bg-slate-900 dark:focus:ring-blue-950"
                 />
               </label>
-            </div>
+              </div>
+            </details>
           </form>
 
           <div className="mt-4">

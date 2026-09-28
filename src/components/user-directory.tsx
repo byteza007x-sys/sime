@@ -181,28 +181,36 @@ const statusTone = (status: string) => {
 function Avatar({
   user,
   large = false,
+  card = false,
 }: {
   user: DirectoryUser;
   large?: boolean;
+  card?: boolean;
 }) {
-  const sizeClass = large ? "h-24 w-24" : "h-14 w-14";
+  const sizeClass = card
+    ? "h-32 w-28 sm:h-36 sm:w-32"
+    : large
+      ? "h-24 w-24"
+      : "h-14 w-14";
 
   return (
     <div
       className={`${sizeClass} relative shrink-0 overflow-hidden rounded-2xl bg-gradient-to-br from-blue-700 via-sky-500 to-emerald-400 p-[2px] shadow-lg shadow-blue-900/10`}
     >
-      <div className="h-full w-full overflow-hidden rounded-2xl bg-slate-950">
+      <div className="relative h-full w-full overflow-hidden rounded-2xl bg-slate-950">
+        <div className="flex h-full w-full items-center justify-center bg-slate-950 text-lg font-black text-white">
+          {initials(user)}
+        </div>
         {user.engineer.avatarUrl ? (
           <img
             src={user.engineer.avatarUrl}
             alt={user.fullName || user.username || user.email}
-            className="h-full w-full object-cover"
+            onError={(event) => {
+              event.currentTarget.style.display = "none";
+            }}
+            className="absolute inset-0 h-full w-full object-cover"
           />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center bg-slate-950 text-lg font-black text-white">
-            {initials(user)}
-          </div>
-        )}
+        ) : null}
       </div>
     </div>
   );
@@ -513,11 +521,11 @@ export default function UserDirectory({
           {users.map((user) => (
             <article
               key={user.userId}
-              className="group rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-lg dark:border-slate-700 dark:bg-slate-950 dark:hover:border-blue-900 dark:hover:bg-slate-900"
+              className="group flex min-h-full flex-col rounded-2xl border border-slate-200 bg-slate-50 p-4 transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-white hover:shadow-lg dark:border-slate-700 dark:bg-slate-950 dark:hover:border-blue-900 dark:hover:bg-slate-900"
             >
-              <div className="flex items-start gap-3">
-                <Avatar user={user} />
-                <div className="min-w-0 flex-1">
+              <div className="grid grid-cols-[112px_minmax(0,1fr)] items-start gap-4 sm:grid-cols-[128px_minmax(0,1fr)]">
+                <Avatar user={user} card />
+                <div className="min-w-0 py-1">
                   <h3 className="truncate text-lg font-black">
                     {user.fullName || user.username || user.email}
                   </h3>
@@ -540,19 +548,39 @@ export default function UserDirectory({
                       {user.isActive ? text.active : text.disabled}
                     </span>
                   </div>
+                  <div className="mt-4 space-y-2 border-t border-slate-200 pt-3 text-xs text-slate-600 dark:border-slate-800 dark:text-slate-300">
+                    <p className="flex min-w-0 items-center gap-2">
+                      <Mail size={14} className="shrink-0 text-slate-400" />
+                      <span className="truncate">{user.email}</span>
+                    </p>
+                    <p className="flex min-w-0 items-center gap-2">
+                      <Phone size={14} className="shrink-0 text-slate-400" />
+                      <span className="truncate">
+                        {user.phone || user.engineer.phone || "-"}
+                      </span>
+                    </p>
+                    <p className="flex min-w-0 items-center gap-2">
+                      <UserRound size={14} className="shrink-0 text-slate-400" />
+                      <span className="truncate">
+                        {[user.engineer.department, user.engineer.position]
+                          .filter(Boolean)
+                          .join(" / ") || "-"}
+                      </span>
+                    </p>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2 text-center">
-                <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+              <div className="mt-4 grid grid-cols-3 divide-x divide-slate-200 border-y border-slate-200 py-3 text-center dark:divide-slate-800 dark:border-slate-800">
+                <div className="px-2">
                   <p className="text-lg font-black">{user.stats.activeJobs}</p>
                   <p className="text-[11px] font-bold text-slate-500">{text.stats.active}</p>
                 </div>
-                <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                <div className="px-2">
                   <p className="text-lg font-black">{user.stats.submittedJobs}</p>
                   <p className="text-[11px] font-bold text-slate-500">{text.stats.submitted}</p>
                 </div>
-                <div className="rounded-xl bg-white p-3 ring-1 ring-slate-200 dark:bg-slate-900 dark:ring-slate-700">
+                <div className="px-2">
                   <p className="text-lg font-black">{user.stats.approvedJobs}</p>
                   <p className="text-[11px] font-bold text-slate-500">{text.stats.approved}</p>
                 </div>
@@ -561,7 +589,7 @@ export default function UserDirectory({
               <button
                 type="button"
                 onClick={() => openUser(user.userId)}
-                className="interactive-button mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white hover:bg-slate-800 dark:bg-blue-700 dark:hover:bg-blue-800"
+                className="interactive-button mt-4 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-slate-800 hover:shadow-md dark:bg-blue-700 dark:hover:bg-blue-800"
               >
                 <ScrollText size={16} />
                 {text.details}

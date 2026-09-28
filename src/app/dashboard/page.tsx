@@ -747,18 +747,18 @@ export default async function DashboardPage({
               </div>
             </section>
 
-            <section className="animate-panel rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-              <form className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <section className="animate-panel rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_30px_rgba(15,23,42,0.06)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_10px_30px_rgba(0,0,0,0.18)]">
+              <form className="grid gap-5 xl:grid-cols-[minmax(190px,0.55fr)_minmax(0,2fr)] xl:items-end">
                 <input type="hidden" name="lang" value={locale} />
-                <div>
+                <div className="self-center">
                   <p className="text-sm font-bold">
                     {locale === "th" ? "ตัวกรอง Total Job" : "Total Job filter"}
                   </p>
-                  <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
+                  <p className="mt-1.5 text-xs font-semibold leading-5 text-slate-500 dark:text-slate-400">
                     {selectedRangeLabel}
                   </p>
                 </div>
-                <div className="grid gap-3 md:grid-cols-[120px_170px_120px_170px_auto]">
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(110px,0.75fr)_minmax(150px,1fr)_minmax(110px,0.75fr)_minmax(150px,1fr)_auto] lg:items-end">
                   <label className="block">
                     <span className="text-xs font-bold text-slate-500">
                       {locale === "th" ? "ปีเริ่ม" : "From year"}
@@ -766,7 +766,7 @@ export default async function DashboardPage({
                     <select
                       name="fromYear"
                       defaultValue={selectedFromYear}
-                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                      className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:bg-slate-950 dark:focus:ring-blue-950"
                     >
                       {yearOptions.map((year) => (
                         <option key={year} value={year}>
@@ -782,7 +782,7 @@ export default async function DashboardPage({
                     <select
                       name="fromMonth"
                       defaultValue={selectedFromMonth}
-                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                      className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:bg-slate-950 dark:focus:ring-blue-950"
                     >
                       {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
                         <option key={month} value={month}>
@@ -800,7 +800,7 @@ export default async function DashboardPage({
                     <select
                       name="toYear"
                       defaultValue={selectedToYear}
-                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                      className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:bg-slate-950 dark:focus:ring-blue-950"
                     >
                       {yearOptions.map((year) => (
                         <option key={year} value={year}>
@@ -816,7 +816,7 @@ export default async function DashboardPage({
                     <select
                       name="toMonth"
                       defaultValue={selectedToMonth}
-                      className="mt-1 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none focus:border-blue-400 dark:border-slate-700 dark:bg-slate-950"
+                      className="mt-1.5 h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm font-bold outline-none transition focus:border-blue-400 focus:bg-white focus:ring-4 focus:ring-blue-100/70 dark:border-slate-700 dark:bg-slate-950 dark:focus:bg-slate-950 dark:focus:ring-blue-950"
                     >
                       {Array.from({ length: 12 }, (_, index) => index + 1).map((month) => (
                         <option key={month} value={month}>
@@ -829,7 +829,7 @@ export default async function DashboardPage({
                   </label>
                   <button
                     type="submit"
-                    className="interactive-button inline-flex h-11 items-center justify-center rounded-lg bg-blue-700 px-4 text-sm font-bold text-white hover:bg-blue-800"
+                    className="interactive-button inline-flex h-11 items-center justify-center rounded-lg bg-blue-700 px-5 text-sm font-bold text-white shadow-[0_6px_16px_rgba(29,78,216,0.22)] transition hover:bg-blue-800 sm:col-span-2 lg:col-span-1"
                   >
                     {locale === "th" ? "ใช้ตัวกรอง" : "Apply"}
                   </button>
@@ -837,19 +837,39 @@ export default async function DashboardPage({
               </form>
             </section>
 
-            <section className="stagger-list grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-              {kpis.map(([value, label, Icon, tone]) => (
+            <section className="stagger-list grid auto-rows-[minmax(116px,auto)] gap-4 sm:grid-cols-2 xl:grid-cols-5">
+              {kpis.map(([value, label, Icon, tone], index) => (
                 <div
                   key={label}
-                  className="interactive-card rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
+                  className={`interactive-card rounded-xl border border-slate-200/80 bg-white p-5 shadow-[0_10px_28px_rgba(15,23,42,0.07)] dark:border-slate-800 dark:bg-slate-900 dark:shadow-[0_10px_28px_rgba(0,0,0,0.2)] ${
+                    index === 0
+                      ? "sm:col-span-2 xl:col-span-2 xl:p-6"
+                      : ""
+                  }`}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${tone}`}>
-                      <Icon size={22} />
+                  <div
+                    className={`flex h-full gap-4 ${
+                      index === 0
+                        ? "items-center justify-between"
+                        : "items-center"
+                    }`}
+                  >
+                    <div
+                      className={`flex shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ring-black/[0.03] dark:ring-white/[0.06] ${tone} ${
+                        index === 0 ? "h-13 w-13" : "h-12 w-12"
+                      }`}
+                    >
+                      <Icon size={index === 0 ? 25 : 22} strokeWidth={1.8} />
                     </div>
-                    <div>
-                      <p className="text-2xl font-bold">{value}</p>
-                      <p className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                    <div className={index === 0 ? "text-right" : "min-w-0"}>
+                      <p
+                        className={`font-bold tabular-nums text-slate-950 dark:text-white ${
+                          index === 0 ? "text-3xl" : "text-2xl"
+                        }`}
+                      >
+                        {value}
+                      </p>
+                      <p className="mt-1 text-xs font-semibold text-slate-500 dark:text-slate-400">
                         {label}
                       </p>
                     </div>
